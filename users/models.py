@@ -2,7 +2,7 @@ from django.db import models
 import uuid
 
 class User(models.Model):
-    userid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    userid = models.UUIDField(primary_key=True, editable=True, default=uuid.uuid4, blank=True)
     gender = models.CharField(max_length=6)
     phone = models.CharField(max_length=10)
     age = models.IntegerField()
