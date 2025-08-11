@@ -30,6 +30,7 @@ BASE_APPS = [
 
 LOCAL_APPS = [
     # Add your local apps here
+    
 ]
 
 THIRD_APPS = [

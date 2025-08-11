@@ -50,6 +50,9 @@ coverage.xml
 # pipenv
 Pipfile.lock
 
+#rules
+.github/
+
 # dotenv
 .env
 .env.*
