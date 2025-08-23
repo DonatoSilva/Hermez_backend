@@ -7,8 +7,9 @@ class AddressSerializer(serializers.ModelSerializer):
         fields = (
             'addressId',
             'userId',
+            'name',
             'description',
-            'street',
+            'address',
             'city',
             'type'
         )
