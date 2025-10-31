@@ -8,7 +8,7 @@ from .serializers import UserSerializer, UserRatingSerializer
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = [permissions.AllowAny] #TODO: buscar forma de validar con clerk framework
+    permission_classes = [permissions.IsAuthenticated]
 
     @action(detail=True, methods=['get'], url_path='ratings')
     def ratings(self, request, pk=None):
@@ -33,4 +33,4 @@ class UserViewSet(viewsets.ModelViewSet):
 class UserRatingViewSet(viewsets.ModelViewSet):
     queryset = UserRating.objects.all()
     serializer_class = UserRatingSerializer
-    permission_classes = [permissions.AllowAny] #TODO: buscar forma de validar con clerk framework
+    permission_classes = [permissions.IsAuthenticated]

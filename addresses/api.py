@@ -7,4 +7,4 @@ from .serializers import AddressSerializer
 class AddressViewSet(viewsets.ModelViewSet):
     queryset = Address.objects.all()
     serializer_class = AddressSerializer
-    permission_classes = [permissions.AllowAny]  # TODO: buscar forma de validar con clerk framework
+    permission_classes = [permissions.IsAuthenticated]

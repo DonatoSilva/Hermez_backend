@@ -1,13 +1,10 @@
-from rest_framework.authentication import BaseAuthentication
-from rest_framework.exceptions import AuthenticationFailed
-from django.contrib.auth import get_user_model
-from django.conf import settings
 import jwt
 import requests
+from django.conf import settings
+from rest_framework.authentication import BaseAuthentication
+from rest_framework.exceptions import AuthenticationFailed
 from django.core.cache import cache
-from jwt.algorithms import RSAAlgorithm
 
-User = get_user_model()
 
 class ClerkAuthentication(BaseAuthentication):
     def authenticate(self, request):
@@ -17,70 +14,73 @@ class ClerkAuthentication(BaseAuthentication):
             return None
 
         try:
-            token_type, token = auth_header.split(' ')
-            if token_type.lower() != 'bearer':
-                return None
-        except ValueError:
-            return None
+            token = auth_header.split(' ')[1]
+        except IndexError:
+            raise AuthenticationFailed('Formato de encabezado de autorización inválido.')
 
         try:
-            # Obtener JWKS de Clerk (cacheado para eficiencia)
             jwks_data = cache.get('clerk_jwks')
             if not jwks_data:
-                jwks_url = f"https://{settings.CLERK_FRONTEND_API_URL}/.well-known/jwks.json"
+                jwks_url = f"{settings.CLERK_FRONTEND_API_URL.rstrip('/')}/.well-known/jwks.json"
                 response = requests.get(jwks_url)
                 response.raise_for_status()
                 jwks_data = response.json()
-                cache.set('clerk_jwks', jwks_data, timeout=3600)  # Cache por 1 hora
+                cache.set('clerk_jwks', jwks_data, timeout=3600) # Cache por 1 hora
+            else:
+                print(jwks_data)
 
-            # Encontrar la clave de firma correcta
-            header = jwt.get_unverified_header(token)
-            kid = header['kid']
-            public_key = None
-            for key in jwks_data['keys']:
-                if key['kid'] == kid:
-                    public_key = RSAAlgorithm.from_jwk(key)
-                    break
+            public_keys = {}
+            for jwk in jwks_data['keys']:
+                kid = jwk['kid']
+                public_keys[kid] = jwt.algorithms.RSAAlgorithm.from_jwk(jwk)
+
+            unverified_header = jwt.get_unverified_header(token)
+            kid = unverified_header['kid']
+            public_key = public_keys.get(kid)
 
             if not public_key:
-                raise AuthenticationFailed('Clave de firma JWT no encontrada.')
+                raise AuthenticationFailed('Clave pública no encontrada.')
 
-            # Decodificar y verificar el token
-            payload = jwt.decode(
+            # Asegúrate de que estos valores coincidan exactamente con tu configuración de Clerk
+            expected_issuer = settings.CLERK_JWT_ISSUER
+            expected_audience = settings.CLERK_JWT_AUDIENCE
+
+            decoded_token = jwt.decode(
                 token,
                 public_key,
-                algorithms=["RS256"],  # Clerk usa RS256 por defecto
-                audience=settings.CLERK_JWT_AUDIENCE,
-                issuer=settings.CLERK_JWT_ISSUER,
+                algorithms=['RS256'],
+                audience=expected_audience,
+                issuer=expected_issuer,
                 options={"verify_signature": True}
             )
 
-            clerk_user_id = payload.get('sub')
+            user_id = decoded_token.get('sub')
+            if not user_id:
+                raise AuthenticationFailed('Token inválido: falta el ID de usuario.')
 
-            if not clerk_user_id:
-                raise AuthenticationFailed('No se encontró el ID de usuario de Clerk en el token.')
-
-            # Busca o crea el usuario en tu base de datos de Django
-            # Asignamos el clerk_id como userid para mantener trazabilidad fácil
-            user, created = User.objects.get_or_create(
-                clerk_id=clerk_user_id, 
-                defaults={
-                    'userid': clerk_user_id,  # Usar el mismo ID de Clerk como userid
-                    'gender': 'other',  # Valor por defecto, se puede actualizar después
-                    'phone': '',  # Valor por defecto, se puede actualizar después
-                    'age': 0  # Valor por defecto, se puede actualizar después
-                }
-            )
-
+            # Aquí puedes buscar o crear el usuario en tu base de datos
+            # Por ahora, solo devolvemos un usuario ficticio o el ID de Clerk
+            from .models import User # Asumiendo que tienes un modelo User
+            try:
+                user = User.objects.get(userid=user_id)
+            except User.DoesNotExist:
+                # Si el usuario no existe en tu DB, puedes crearlo o levantar un error
+                user = User.objects.create(userid=user_id, username=f"clerk_user_{user_id}")
+            
             return (user, token)
-        except jwt.ExpiredSignatureError:
-            raise AuthenticationFailed('Token de autenticación expirado.')
-        except jwt.InvalidTokenError:
-            raise AuthenticationFailed('Token de autenticación inválido.')
+
         except requests.exceptions.RequestException as e:
-            raise AuthenticationFailed(f'Error al obtener JWKS de Clerk: {e}')
+            raise AuthenticationFailed('Error de red al obtener claves de autenticación.')
+        except jwt.ExpiredSignatureError:
+            raise AuthenticationFailed('Token expirado.')
+        except jwt.InvalidAudienceError:
+            raise AuthenticationFailed('Audiencia de token inválida.')
+        except jwt.InvalidIssuerError:
+            raise AuthenticationFailed('Emisor de token inválido.')
+        except jwt.InvalidTokenError as e:
+            raise AuthenticationFailed(f'Token inválido: {e}')
         except Exception as e:
-            raise AuthenticationFailed(f'Error de autenticación: {e}')
+            raise AuthenticationFailed(f'Error de autenticación inesperado: {e}')
 
     def authenticate_header(self, request):
         return 'Bearer'

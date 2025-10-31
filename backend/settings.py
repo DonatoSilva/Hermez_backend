@@ -145,9 +145,9 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Clerk Authentication Settings
-CLERK_FRONTEND_API_URL = 'your-clerk-frontend-api-url'  # Reemplazar con tu URL de Clerk
-CLERK_JWT_AUDIENCE = 'your-clerk-jwt-audience'  # Reemplazar con tu audience de Clerk
-CLERK_JWT_ISSUER = 'your-clerk-jwt-issuer'  # Reemplazar con tu issuer de Clerk
+CLERK_FRONTEND_API_URL = 'https://teaching-bee-17.clerk.accounts.dev'  
+CLERK_JWT_AUDIENCE = 'hermez-backend-api'  
+CLERK_JWT_ISSUER = CLERK_FRONTEND_API_URL
 
 # Django REST Framework Settings
 REST_FRAMEWORK = {
@@ -166,3 +166,5 @@ CACHES = {
         'LOCATION': 'unique-snowflake',
     }
 }
+
+AUTH_USER_MODEL = 'users.User'
