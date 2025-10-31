@@ -3,7 +3,7 @@ from django.utils.crypto import get_random_string
 import uuid
 
 class User(models.Model):
-    userid = models.CharField(primary_key=True, editable=True, default=f"'user_'{get_random_string(12)}", blank=True)
+    userid = models.CharField(primary_key=True, editable=True, default=f"user_{get_random_string(12)}", blank=True)
     gender = models.CharField(max_length=6, choices=[
         ('male', 'Male'),
         ('female', 'Female'),
