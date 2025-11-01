@@ -5,6 +5,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('userid', 'gender', 'phone', 'age')
+        read_only_fields = ('userid',)
 
 class UserRatingSerializer(serializers.ModelSerializer):
     class Meta:

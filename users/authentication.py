@@ -26,8 +26,6 @@ class ClerkAuthentication(BaseAuthentication):
                 response.raise_for_status()
                 jwks_data = response.json()
                 cache.set('clerk_jwks', jwks_data, timeout=3600) # Cache por 1 hora
-            else:
-                print(jwks_data)
 
             public_keys = {}
             for jwk in jwks_data['keys']:

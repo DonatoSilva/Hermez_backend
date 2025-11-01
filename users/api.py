@@ -6,10 +6,16 @@ from addresses.serializers import AddressSerializer
 from .serializers import UserSerializer, UserRatingSerializer
 
 class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        user = User.objects.filter(pk=self.request.user.pk)
+        if user.exists():
+            return user
+        else:
+            return Response({'error': 'User not found'}, status=404)
+        
     @action(detail=True, methods=['get'], url_path='ratings')
     def ratings(self, request, pk=None):
         """
@@ -20,11 +26,11 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(ratings, many=True)
         return Response(serializer.data)
     
+    """
+        GET /api/users/my-addresses/ -> lista las direcciones del usuario
+        """
     @action(detail=True, methods=['get'], url_path='addresses')
     def addresses(self, request, pk=None):
-        """
-        GET /api/users/{user_id}/addresses/ -> lista las direcciones del usuario
-        """
         user = self.get_object()
         addresses = user.addresses.all()
         serializer = AddressSerializer(addresses, many=True, context=self.get_serializer_context())
