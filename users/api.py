@@ -23,12 +23,16 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['patch'], url_path='update', url_name='update-user')
     def update_user(self, request, pk=None):
+        """
+        PATCH /api/users/update/ -> actualiza los datos del usuario autenticado
+        """
         user = request.user
         serializer = self.get_serializer(user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response({'message': f'User {user.userid} updated successfully'}, status=status.HTTP_200_OK)
         else:
+            print(serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         
     @action(detail=True, methods=['get'], url_path='ratings')

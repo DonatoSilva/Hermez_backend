@@ -9,6 +9,7 @@ class Address(models.Model):
 	type = models.CharField(max_length=20, choices=[('casa', 'Casa'), ('trabajo', 'Trabajo'), ('edificio', 'Edificio')])
 	address = models.CharField(max_length=100)
 	city = models.CharField(max_length=50)
+	isFavorite = models.BooleanField(default=False)
 
 	def __str__(self):
 		return f"{self.address}, {self.city}"
