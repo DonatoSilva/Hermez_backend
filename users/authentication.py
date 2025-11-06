@@ -63,7 +63,7 @@ class ClerkAuthentication(BaseAuthentication):
                 user = User.objects.get(userid=user_id)
             except User.DoesNotExist:
                 # Si el usuario no existe en tu DB, puedes crearlo o levantar un error
-                user = User.objects.create(userid=user_id, username=f"clerk_user_{user_id}")
+                user = User.objects.create(userid=user_id)
             
             return (user, token)
 

@@ -13,3 +13,4 @@ class AddressSerializer(serializers.ModelSerializer):
             'city',
             'type'
         )
+        read_only_fields = ('userId',)

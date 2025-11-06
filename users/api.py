@@ -4,19 +4,24 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from addresses.serializers import AddressSerializer
 from .serializers import UserSerializer, UserRatingSerializer
+from users.authentication import ClerkAuthentication
 
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [ClerkAuthentication]
 
     def get_queryset(self):
-        user = User.objects.filter(pk=self.request.user.pk)
-        if user.exists():
-            return user
+        if self.request.user.is_authenticated:
+            return User.objects.filter(pk=self.request.user.pk)
         else:
-            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+            return User.objects.none()
 
+    ## Funciones para la gestion del usuario: se busca que solo el propio usuario pueda actualizar o eliminar su perfil
     def update(self, request, *args, **kwargs):
+        """
+        PATCH /api/users/{pk}/ -> actualiza los datos del usuario autenticado /// se modifico el comportamiento por defecto
+        """
         if self.request.user.pk != kwargs.get('pk'):
             return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
         return self.partial_update(request, *args, **kwargs)
@@ -34,6 +39,27 @@ class UserViewSet(viewsets.ModelViewSet):
         else:
             print(serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        DELETE /api/users/{pk}/ -> elimina el perfil del usuario autenticado /// se modifico el comportamiento por defecto
+        """
+        if self.request.user.pk != kwargs.get('pk'):
+            return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
+        return super().destroy(request, *args, **kwargs)
+
+
+    @action(detail=False, methods=['delete'], url_path='delete', url_name='delete-user')
+    def delete_user(self, request):
+        """
+        DELETE /api/me/delete/ -> elimina el perfil del usuario autenticado
+        """
+        try:
+            user = request.user
+            user.delete()
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
     @action(detail=True, methods=['get'], url_path='ratings')
     def ratings(self, request, pk=None):
@@ -43,16 +69,6 @@ class UserViewSet(viewsets.ModelViewSet):
         user = self.get_object()
         ratings = user.received_ratings.all()
         serializer = self.get_serializer(ratings, many=True)
-        return Response(serializer.data)
-    
-    """
-        GET /api/users/my-addresses/ -> lista las direcciones del usuario
-        """
-    @action(detail=True, methods=['get'], url_path='addresses')
-    def addresses(self, request, pk=None):
-        user = self.get_object()
-        addresses = user.addresses.all()
-        serializer = AddressSerializer(addresses, many=True, context=self.get_serializer_context())
         return Response(serializer.data)
 
 class UserRatingViewSet(viewsets.ModelViewSet):

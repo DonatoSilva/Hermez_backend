@@ -6,9 +6,16 @@ from .serializers import AddressSerializer
 
 
 class AddressViewSet(viewsets.ModelViewSet):
-    queryset = Address.objects.all()
     serializer_class = AddressSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        if self.request.user and self.request.user.is_authenticated:
+            return Address.objects.filter(userId=self.request.user)
+        return Address.objects.none()
+
+    def perform_create(self, serializer):
+        serializer.save(userId=self.request.user)
 
     @action(detail=True, methods=['post'], url_path='add-favorite')
     def add_favorite(self, request, pk=None):
