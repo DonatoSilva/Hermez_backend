@@ -23,6 +23,6 @@ class AddressViewSet(viewsets.ModelViewSet):
         POST /addresses/<pk>/add-favorite/ -> agrega una dirección a favoritos
         """
         address = self.get_object()
-        address.isFavorite = True
+        address.isFavorite = not address.isFavorite
         address.save()
-        return Response({'message': 'Dirección agregada a favoritos'}, status=status.HTTP_200_OK)
+        return Response({'message': 'Dirección agregada a favoritos' if address.isFavorite else 'Dirección eliminada de favoritos', 'isFavorite': address.isFavorite}, status=status.HTTP_200_OK)

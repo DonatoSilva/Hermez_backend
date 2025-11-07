@@ -11,6 +11,7 @@ class AddressSerializer(serializers.ModelSerializer):
             'description',
             'address',
             'city',
-            'type'
+            'type', 
+            'isFavorite',
         )
-        read_only_fields = ('userId',)
+        read_only_fields = ('userId', 'addressId')
