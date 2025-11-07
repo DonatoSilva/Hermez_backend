@@ -8,5 +8,6 @@ router.register('user-ratings', UserRatingViewSet, 'user-ratings')
 
 urlpatterns = [
     path('api/me/', include('addresses.urls')),
+    path('api/me/', include('vehicles.urls')),  
     path('api/', include(router.urls)),
 ]
