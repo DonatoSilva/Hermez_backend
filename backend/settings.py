@@ -151,6 +151,9 @@ CLERK_FRONTEND_API_URL = 'https://teaching-bee-17.clerk.accounts.dev'
 CLERK_JWT_AUDIENCE = 'hermez-backend-api'  
 CLERK_JWT_ISSUER = CLERK_FRONTEND_API_URL
 
+# Clerk Webhook Signing Secret
+CLERK_WEBHOOK_SIGNING_SECRET = "tu_signing_secret_de_clerk"
+
 # Django REST Framework Settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [

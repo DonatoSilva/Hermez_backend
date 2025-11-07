@@ -11,6 +11,12 @@ class User(models.Model):
     ], blank=True, null=True)
     phone = models.CharField(max_length=10, blank=True, null=True)
     age = models.IntegerField(blank=True, null=True)
+    role = models.CharField(max_length=10, choices=[
+        ('client', 'Client'),
+        ('delivery', 'Delivery'),
+    ], blank=True, null=True)
+    is_online = models.BooleanField(default=False)
+    is_available = models.BooleanField(default=False)
 
     # Campo de contraseña requerido por Django, pero no usado por Clerk
     password = models.CharField(max_length=128, blank=True, null=True)
