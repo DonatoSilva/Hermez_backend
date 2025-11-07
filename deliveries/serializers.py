@@ -2,9 +2,9 @@ from rest_framework import serializers
 from .models import DeliveryCategory, DeliveryQuote, DeliveryOffer
 from users.serializers import UserSerializer
 from addresses.serializers import AddressSerializer
-from vehicles.serializers import VehicleTypeSerializer
 from users.models import User
 from addresses.models import Address
+from vehicles.models import VehicleType
 
 class DeliveryCategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -70,7 +70,7 @@ class DeliveryOfferSerializer(serializers.ModelSerializer):
     """Serializer para ofertas de domiciliarios"""
     delivery_person = UserSerializer(read_only=True)
     quote = DeliveryQuoteSerializer(read_only=True)
-    vehicle_type = VehicleTypeSerializer(read_only=True)
+    vehicle_type = serializers.StringRelatedField(read_only=True)
     
     # Campos para escritura
     delivery_person_id = serializers.PrimaryKeyRelatedField(
@@ -84,8 +84,8 @@ class DeliveryOfferSerializer(serializers.ModelSerializer):
         write_only=True
     )
     vehicle_type_id = serializers.PrimaryKeyRelatedField(
-        queryset=VehicleType.objects.all(), 
-        source='vehicle_type', 
+        queryset=VehicleType.objects.all(),
+        source='vehicle_type',
         write_only=True,
         required=False
     )

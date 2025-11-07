@@ -1,10 +1,9 @@
 from rest_framework import serializers
 from .models import Vehicle, VehicleType
-from deliveries.serializers import DeliveryCategorySerializer
 
 
 class VehicleTypeSerializer(serializers.ModelSerializer):
-    delivery_categories = DeliveryCategorySerializer(many=True, read_only=True)
+    delivery_categories = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
     
     class Meta:
         model = VehicleType

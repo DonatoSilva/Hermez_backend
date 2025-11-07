@@ -1,6 +1,5 @@
 from django.db import models
 from users.models import User
-from deliveries.models import DeliveryCategory
 import uuid
 
 
@@ -14,7 +13,7 @@ class VehicleType(models.Model):
     max_weight_capacity_kg = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     max_volume_capacity_liters = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     passenger_capacity = models.IntegerField(blank=True, null=True)
-    delivery_categories = models.ManyToManyField(DeliveryCategory, blank=True)
+    delivery_categories = models.ManyToManyField('deliveries.DeliveryCategory', blank=True)
     image = models.URLField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

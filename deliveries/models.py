@@ -3,7 +3,6 @@ from django.utils import timezone
 import uuid
 from users.models import User
 from addresses.models import Address
-from vehicles.models import VehicleType
 
 # Create your models here.
 
@@ -132,7 +131,7 @@ class DeliveryOffer(models.Model):
     quote = models.ForeignKey(DeliveryQuote, on_delete=models.CASCADE, related_name='offers')
     proposed_price = models.DecimalField(max_digits=10, decimal_places=2)
     estimated_delivery_time = models.DurationField(null=True, blank=True)
-    vehicle_type = models.ForeignKey(VehicleType, on_delete=models.SET_NULL, null=True, blank=True)
+    vehicle_type = models.ForeignKey('vehicles.VehicleType', on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     expires_at = models.DateTimeField()  # Fecha de expiración automática
     is_active = models.BooleanField(default=True)

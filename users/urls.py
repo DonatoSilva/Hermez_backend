@@ -8,8 +8,8 @@ router.register('me', UserViewSet, 'user')
 router.register('user-ratings', UserRatingViewSet, 'user-ratings')
 
 urlpatterns = [
-    path('api/me/', include('addresses.urls')),
-    path('api/me/', include('vehicles.urls')),
-    path('api/', include(router.urls)),
+    path('api/me/', include('addresses.urls'), name='addresses'),
+    path('api/me/', include('vehicles.urls'), name='vehicles'),
+    path('api/', include(router.urls), name='users'),
     path("webhooks/clerk/", clerk_webhook, name="clerk_webhook"),
 ]
