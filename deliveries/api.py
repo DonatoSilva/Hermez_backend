@@ -1,14 +1,18 @@
-from rest_framework import viewsets, status
+from rest_framework import permissions, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404
 from .models import DeliveryQuote, DeliveryOffer, DeliveryCategory, Delivery, DeliveryHistory
 from .serializers import DeliveryQuoteSerializer, DeliveryOfferSerializer, DeliveryCategorySerializer, DeliverySerializer, DeliveryHistorySerializer
 
+class DeliveryCategoryViewSet(viewsets.ModelViewSet):
+    queryset = DeliveryCategory.objects.all()
+    serializer_class = DeliveryCategorySerializer
+    permission_classes = [permissions.IsAuthenticated]
 
 class DeliveryViewSet(viewsets.ModelViewSet):
     queryset = Delivery.objects.all()
     serializer_class = DeliverySerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     @action(detail=True, methods=['post'])
     def change_status(self, request, pk=None):
@@ -41,6 +45,7 @@ class DeliveryViewSet(viewsets.ModelViewSet):
 class DeliveryOfferViewSet(viewsets.ModelViewSet):
     queryset = DeliveryOffer.objects.all()
     serializer_class = DeliveryOfferSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     @action(detail=True, methods=['post'])
     def accept(self, request, pk=None):
@@ -126,6 +131,7 @@ class DeliveryOfferViewSet(viewsets.ModelViewSet):
 class DeliveryQuoteViewSet(viewsets.ModelViewSet):
     queryset = DeliveryQuote.objects.all()
     serializer_class = DeliveryQuoteSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
@@ -156,7 +162,7 @@ class DeliveryQuoteViewSet(viewsets.ModelViewSet):
 class DeliveryHistoryViewSet(viewsets.ReadOnlyModelViewSet):
     """API para consultar el historial de eventos de domicilios usando history_id"""
     serializer_class = DeliveryHistorySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
         queryset = DeliveryHistory.objects.all()

@@ -2,7 +2,6 @@ from .models import User, UserRating
 from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from addresses.serializers import AddressSerializer
 from .serializers import UserSerializer, UserRatingSerializer
 from users.authentication import ClerkAuthentication
 

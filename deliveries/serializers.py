@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import DeliveryCategory, DeliveryQuote, DeliveryOffer
+from .models import DeliveryCategory, DeliveryQuote, DeliveryOffer, Delivery, DeliveryHistory
 from users.serializers import UserSerializer
 from addresses.serializers import AddressSerializer
 from users.models import User
@@ -107,7 +107,7 @@ class DeliverySerializer(serializers.ModelSerializer):
         fields = [
             'id', 'client', 'delivery_person', 'pickup_address', 'delivery_address', 'category',
             'description', 'estimated_weight', 'estimated_size', 'final_price', 'status',
-            'created_at', 'updated_at', 'completed_at', 'cancelled_at',
+            'created_at', 'updated_at', 'completed_at', 'cancelled_at', 'rating',
             'client_id', 'delivery_person_id', 'pickup_address_id', 'delivery_address_id', 'category_id'
         ]
         read_only_fields = ['status', 'created_at', 'updated_at', 'completed_at', 'cancelled_at']

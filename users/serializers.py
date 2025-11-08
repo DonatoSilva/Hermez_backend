@@ -8,6 +8,9 @@ class UserSerializer(serializers.ModelSerializer):
         read_only_fields = ('userid',)
 
 class UserRatingSerializer(serializers.ModelSerializer):
+    ratee = UserSerializer(read_only=True)
+    rater = UserSerializer(read_only=True)
+
     class Meta:
         model = UserRating
-        fields = ('userRatingId', 'ratee', 'rater', 'rating', 'comment')
+        fields = ('id', 'ratee', 'rater', 'rating', 'comment')
