@@ -5,8 +5,6 @@ from users.models import User
 from addresses.models import Address
 
 # Create your models here.
-
-
 class DeliveryCategory(models.Model):
     """
     Modelo para categorizar los tipos de entregas que pueden realizar los vehículos
@@ -52,6 +50,7 @@ class DeliveryQuote(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    history_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)  # ID único para todo el ciclo de vida
 
     class Meta:
         verbose_name = "Cotización de Entrega"
@@ -80,39 +79,6 @@ class DeliveryQuote(models.Model):
         self.is_active = False
         self.status = 'expired'
         self.save()
-
-    @classmethod
-    def cleanup_expired(cls, days=30):
-        """Método de clase para limpiar cotizaciones expiradas"""
-        from django.utils import timezone
-        from datetime import timedelta
-        
-        cutoff_date = timezone.now() - timedelta(days=days)
-        expired_quotes = cls.objects.filter(
-            expires_at__lt=timezone.now(),
-            status__in=['pending', 'expired'],
-            is_active=True,
-            updated_at__lt=cutoff_date
-        )
-        
-        deactivated_count = expired_quotes.update(is_active=False, status='expired')
-        return deactivated_count
-
-    @classmethod
-    def purge_old_inactive(cls, days=90):
-        """Elimina permanentemente cotizaciones inactivas muy antiguas"""
-        from django.utils import timezone
-        from datetime import timedelta
-        
-        cutoff_date = timezone.now() - timedelta(days=days)
-        old_quotes = cls.objects.filter(
-            is_active=False,
-            updated_at__lt=cutoff_date
-        )
-        
-        deleted_count = old_quotes.count()
-        old_quotes.delete()
-        return deleted_count
 
 
 class DeliveryOffer(models.Model):
@@ -168,36 +134,88 @@ class DeliveryOffer(models.Model):
             self.status = 'expired'
         self.save()
 
-    @classmethod
-    def cleanup_expired(cls, days=30):
-        """Método de clase para limpiar ofertas expiradas"""
-        from django.utils import timezone
-        from datetime import timedelta
-        from django.db import models
-        
-        cutoff_date = timezone.now() - timedelta(days=days)
-        expired_offers = cls.objects.filter(
-            models.Q(expires_at__lt=timezone.now()) |
-            models.Q(status='rejected'),
-            is_active=True,
-            created_at__lt=cutoff_date
-        )
-        
-        deactivated_count = expired_offers.update(is_active=False)
-        return deactivated_count
 
-    @classmethod
-    def purge_old_inactive(cls, days=90):
-        """Elimina permanentemente ofertas inactivas muy antiguas"""
-        from django.utils import timezone
-        from datetime import timedelta
-        
-        cutoff_date = timezone.now() - timedelta(days=days)
-        old_offers = cls.objects.filter(
-            is_active=False,
-            updated_at__lt=cutoff_date
-        )
-        
-        deleted_count = old_offers.count()
-        old_offers.delete()
-        return deleted_count
+class Delivery(models.Model):
+    """
+    Modelo para domicilios permanentes que se crean cuando una oferta es aceptada
+    """
+    STATUS_CHOICES = [
+        ('pending', 'Pendiente'),
+        ('picked_up', 'Recogido'),
+        ('in_transit', 'En tránsito'),
+        ('delivered', 'Entregado'),
+        ('cancelled', 'Cancelado'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='deliveries')
+    delivery_person = models.ForeignKey(User, on_delete=models.CASCADE, related_name='assigned_deliveries', null=True, blank=True)
+    pickup_address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name='pickup_deliveries')
+    delivery_address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name='delivery_deliveries')
+    category = models.ForeignKey(DeliveryCategory, on_delete=models.CASCADE)
+    description = models.TextField(blank=True, null=True)
+    estimated_weight = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    estimated_size = models.CharField(max_length=100, blank=True, null=True)
+    final_price = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    quote = models.ForeignKey(DeliveryQuote, on_delete=models.SET_NULL, null=True, blank=True, related_name='deliveries')
+    history_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)  # ID único para todo el ciclo de vida
+
+    class Meta:
+        verbose_name = "Domicilio"
+        verbose_name_plural = "Domicilios"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['client']),
+            models.Index(fields=['delivery_person']),
+        ]
+
+    def __str__(self):
+        return f"Domicilio {self.id} - {self.client}"
+
+    def save(self, *args, **kwargs):
+        # Actualizar timestamps de finalización/cancelación según el estado
+        if self.status == 'delivered' and not self.completed_at:
+            self.completed_at = timezone.now()
+        elif self.status == 'cancelled' and not self.cancelled_at:
+            self.cancelled_at = timezone.now()
+        super().save(*args, **kwargs)
+
+
+class DeliveryHistory(models.Model):
+    """
+    Modelo para registrar el historial completo de eventos de un domicilio
+    Incluye desde la creación de la cotización hasta la finalización del domicilio
+    """
+    EVENT_TYPE_CHOICES = [
+        ('quote_created', 'Cotización Creada'),
+        ('offer_made', 'Oferta Realizada'),
+        ('offer_accepted', 'Oferta Aceptada'),
+        ('status_changed', 'Estado Cambiado'),
+        ('cancelled', 'Cancelado'),
+        ('completed', 'Completado'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    history_id = models.UUIDField()  # ID único que conecta todo el ciclo de vida
+    event_type = models.CharField(max_length=20, choices=EVENT_TYPE_CHOICES)
+    description = models.TextField()
+    changed_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='delivery_history_changes')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Historial de Domicilio"
+        verbose_name_plural = "Historiales de Domicilio"
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['history_id']),
+            models.Index(fields=['event_type']),
+        ]
+
+    def __str__(self):
+        return f"Historial {self.id} - {self.get_event_type_display()}"

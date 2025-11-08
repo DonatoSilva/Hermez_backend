@@ -66,6 +66,82 @@ class DeliveryQuoteSerializer(serializers.ModelSerializer):
         return data
 
 
+class DeliverySerializer(serializers.ModelSerializer):
+    """Serializer para domicilios permanentes"""
+    client = UserSerializer(read_only=True)
+    delivery_person = UserSerializer(read_only=True)
+    pickup_address = AddressSerializer(read_only=True)
+    delivery_address = AddressSerializer(read_only=True)
+    category = serializers.StringRelatedField(read_only=True)
+    
+    # Campos para escritura
+    client_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), 
+        source='client', 
+        write_only=True
+    )
+    delivery_person_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(), 
+        source='delivery_person', 
+        write_only=True,
+        required=False
+    )
+    pickup_address_id = serializers.PrimaryKeyRelatedField(
+        queryset=Address.objects.all(), 
+        source='pickup_address', 
+        write_only=True
+    )
+    delivery_address_id = serializers.PrimaryKeyRelatedField(
+        queryset=Address.objects.all(), 
+        source='delivery_address', 
+        write_only=True
+    )
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=DeliveryCategory.objects.all(), 
+        source='category', 
+        write_only=True
+    )
+
+    class Meta:
+        model = Delivery
+        fields = [
+            'id', 'client', 'delivery_person', 'pickup_address', 'delivery_address', 'category',
+            'description', 'estimated_weight', 'estimated_size', 'final_price', 'status',
+            'created_at', 'updated_at', 'completed_at', 'cancelled_at',
+            'client_id', 'delivery_person_id', 'pickup_address_id', 'delivery_address_id', 'category_id'
+        ]
+        read_only_fields = ['status', 'created_at', 'updated_at', 'completed_at', 'cancelled_at']
+
+    def validate(self, data):
+        """Validación personalizada para el domicilio"""
+        if data.get('final_price') <= 0:
+            raise serializers.ValidationError("El precio final debe ser mayor a cero")
+        
+        # Validar que pickup y delivery sean direcciones diferentes
+        pickup_address = data.get('pickup_address')
+        delivery_address = data.get('delivery_address')
+        
+        if pickup_address and delivery_address and pickup_address.id == delivery_address.id:
+            raise serializers.ValidationError("Las direcciones de recogida y entrega deben ser diferentes")
+        
+        return data
+
+
+class DeliveryHistorySerializer(serializers.ModelSerializer):
+    """Serializer para historial de domicilios"""
+    quote = DeliveryQuoteSerializer(read_only=True)
+    delivery = DeliverySerializer(read_only=True)
+    changed_by = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = DeliveryHistory
+        fields = [
+            'id', 'quote', 'delivery', 'event_type', 'description', 
+            'changed_by', 'created_at'
+        ]
+        read_only_fields = ['created_at']
+
+
 class DeliveryOfferSerializer(serializers.ModelSerializer):
     """Serializer para ofertas de domiciliarios"""
     delivery_person = UserSerializer(read_only=True)
