@@ -3,8 +3,6 @@ from .models import Vehicle, VehicleType
 
 
 class VehicleTypeSerializer(serializers.ModelSerializer):
-    delivery_categories = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
-    
     class Meta:
         model = VehicleType
         fields = '__all__'

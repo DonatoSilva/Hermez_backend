@@ -20,12 +20,11 @@ class ClerkAuthentication(BaseAuthentication):
 
         try:
             jwks_data = cache.get('clerk_jwks')
-            if not jwks_data:
-                jwks_url = f"{settings.CLERK_FRONTEND_API_URL.rstrip('/')}/.well-known/jwks.json"
-                response = requests.get(jwks_url)
-                response.raise_for_status()
-                jwks_data = response.json()
-                cache.set('clerk_jwks', jwks_data, timeout=3600) # Cache por 1 hora
+            jwks_url = f"{settings.CLERK_FRONTEND_API_URL.rstrip('/')}/.well-known/jwks.json"
+            response = requests.get(jwks_url)
+            response.raise_for_status()
+            jwks_data = response.json()
+                
 
             public_keys = {}
             for jwk in jwks_data['keys']:

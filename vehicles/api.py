@@ -1,8 +1,15 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import Vehicle
-from .serializers import VehicleSerializer
+from .models import Vehicle, VehicleType
+from .serializers import VehicleSerializer, VehicleTypeSerializer
+
+
+class VehicleTypeViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = VehicleType.objects.all()
+    serializer_class = VehicleTypeSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
 
 class VehicleViewSet(viewsets.ModelViewSet):
     serializer_class = VehicleSerializer
