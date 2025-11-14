@@ -32,24 +32,30 @@ class DeliveryQuote(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pendiente'),
         ('accepted', 'Aceptada'),
-        ('expired', 'Expirada'),
         ('cancelled', 'Cancelada'),
+    ]
+    PAYMENT_METHOD_CHOICES = [
+        ('efectivo', 'Efectivo'),
+        ('nequi', 'Nequi'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='delivery_quotes')
-    pickup_address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name='pickup_quotes')
-    delivery_address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name='delivery_quotes')
+    pickup_address = models.ForeignKey(Address, on_delete=models.SET_NULL, related_name='pickup_quotes', null=True, blank=True)
+    pickup_address_text = models.CharField(max_length=255, blank=True, null=True)
+    delivery_address = models.ForeignKey(Address, on_delete=models.SET_NULL, related_name='delivery_quotes', null=True, blank=True)
+    delivery_address_text = models.CharField(max_length=255, blank=True, null=True)
     category = models.ForeignKey(DeliveryCategory, on_delete=models.CASCADE)
     description = models.TextField(blank=True, null=True)
+    observations = models.TextField(blank=True, null=True)
     estimated_weight = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     estimated_size = models.CharField(max_length=100, blank=True, null=True)
     client_price = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='efectivo')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    expires_at = models.DateTimeField()  # Fecha de expiración automática
-    is_active = models.BooleanField(default=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+
     history_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)  # ID único para todo el ciclo de vida
 
     class Meta:
@@ -57,28 +63,19 @@ class DeliveryQuote(models.Model):
         verbose_name_plural = "Cotizaciones de Entrega"
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['status', 'expires_at']),
-            models.Index(fields=['is_active']),
+            models.Index(fields=['status']),
         ]
 
     def __str__(self):
         return f"Cotización {self.id} - {self.client}"
 
     def save(self, *args, **kwargs):
-        # Establecer expiración por defecto (48 horas) si no se especifica
-        if not self.expires_at:
-            self.expires_at = timezone.now() + timezone.timedelta(hours=48)
+        # Validation for addresses
+        if not self.pickup_address and not self.pickup_address_text:
+            raise ValueError("Debe proporcionar una dirección de recogida (ID o texto).")
+        if not self.delivery_address and not self.delivery_address_text:
+            raise ValueError("Debe proporcionar una dirección de entrega (ID o texto).")
         super().save(*args, **kwargs)
-
-    def is_expired(self):
-        """Verifica si la cotización ha expirado"""
-        return timezone.now() > self.expires_at
-
-    def deactivate(self):
-        """Desactiva la cotización"""
-        self.is_active = False
-        self.status = 'expired'
-        self.save()
 
 
 class DeliveryOffer(models.Model):
@@ -89,7 +86,6 @@ class DeliveryOffer(models.Model):
         ('pending', 'Pendiente'),
         ('accepted', 'Aceptada'),
         ('rejected', 'Rechazada'),
-        ('expired', 'Expirada'),
     ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -99,8 +95,6 @@ class DeliveryOffer(models.Model):
     estimated_delivery_time = models.DurationField(null=True, blank=True)
     vehicle_type = models.ForeignKey('vehicles.VehicleType', on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    expires_at = models.DateTimeField()  # Fecha de expiración automática
-    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -109,8 +103,7 @@ class DeliveryOffer(models.Model):
         verbose_name_plural = "Ofertas de Domiciliario"
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['status', 'expires_at']),
-            models.Index(fields=['is_active']),
+            models.Index(fields=['status']),
         ]
         unique_together = ['delivery_person', 'quote']  # Un domiciliario solo una oferta por cotización
 
@@ -140,7 +133,7 @@ class Delivery(models.Model):
     Modelo para domicilios permanentes que se crean cuando una oferta es aceptada
     """
     STATUS_CHOICES = [
-        ('pending', 'Pendiente'),
+        ('assigned', 'Asignado'),
         ('picked_up', 'Recogido'),
         ('in_transit', 'En tránsito'),
         ('delivered', 'Entregado'),
@@ -162,7 +155,6 @@ class Delivery(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
-    quote = models.ForeignKey(DeliveryQuote, on_delete=models.SET_NULL, null=True, blank=True, related_name='deliveries')
     history_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)  # ID único para todo el ciclo de vida
 
     class Meta:
