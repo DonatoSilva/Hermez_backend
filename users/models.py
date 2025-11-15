@@ -18,6 +18,13 @@ class User(models.Model):
     ], blank=True, null=True)
     is_online = models.BooleanField(default=False)
     is_available = models.BooleanField(default=False)
+    current_vehicle = models.ForeignKey(
+        'vehicles.Vehicle', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='active_drivers'
+    )
 
     # Campo de contraseña requerido por Django, pero no usado por Clerk
     password = models.CharField(max_length=128, blank=True, null=True)

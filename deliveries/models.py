@@ -85,7 +85,7 @@ class DeliveryOffer(models.Model):
     quote = models.ForeignKey(DeliveryQuote, on_delete=models.CASCADE, related_name='offers')
     proposed_price = models.DecimalField(max_digits=10, decimal_places=2)
     estimated_delivery_time = models.DurationField(null=True, blank=True)
-    vehicle_type = models.ForeignKey('vehicles.VehicleType', on_delete=models.SET_NULL, null=True, blank=True)
+    vehicle = models.ForeignKey('vehicles.Vehicle', on_delete=models.SET_NULL, null=True, blank=True, related_name='delivery_offers')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -128,6 +128,13 @@ class Delivery(models.Model):
     estimated_weight = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     estimated_size = models.CharField(max_length=100, blank=True, null=True)
     final_price = models.DecimalField(max_digits=10, decimal_places=2)
+    vehicle = models.ForeignKey(
+        'vehicles.Vehicle', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='deliveries'
+    )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='assigned')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

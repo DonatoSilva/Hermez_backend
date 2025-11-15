@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import DeliveryCategory, DeliveryQuote, DeliveryOffer, Delivery, DeliveryHistory
 from users.serializers import UserSerializer
 from users.models import User
-from vehicles.models import VehicleType
+from vehicles.models import VehicleType, Vehicle
 
 class DeliveryCategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -58,6 +58,7 @@ class DeliverySerializer(serializers.ModelSerializer):
     client = UserSerializer(read_only=True)
     delivery_person = UserSerializer(read_only=True)
     category = serializers.StringRelatedField(read_only=True)
+    vehicle = serializers.StringRelatedField(read_only=True)
     
     # Campos para escritura
     client_id = serializers.PrimaryKeyRelatedField(
@@ -76,14 +77,20 @@ class DeliverySerializer(serializers.ModelSerializer):
         source='category', 
         write_only=True
     )
+    vehicle_id = serializers.PrimaryKeyRelatedField(
+        queryset=Vehicle.objects.all(), 
+        source='vehicle', 
+        write_only=True,
+        required=False
+    )
 
     class Meta:
         model = Delivery
         fields = [
             'id', 'client', 'delivery_person', 'pickup_address', 'delivery_address', 'category',
-            'description', 'estimated_weight', 'estimated_size', 'final_price', 'status',
+            'description', 'estimated_weight', 'estimated_size', 'final_price', 'vehicle', 'status',
             'created_at', 'updated_at', 'completed_at', 'cancelled_at',
-            'client_id', 'delivery_person_id', 'category_id'
+            'client_id', 'delivery_person_id', 'category_id', 'vehicle_id'
         ]
         read_only_fields = ['status', 'created_at', 'updated_at', 'completed_at', 'cancelled_at']
 
@@ -120,7 +127,7 @@ class DeliveryOfferSerializer(serializers.ModelSerializer):
     """Serializer para ofertas de domiciliarios"""
     delivery_person = UserSerializer(read_only=True)
     quote = DeliveryQuoteSerializer(read_only=True)
-    vehicle_type = serializers.StringRelatedField(read_only=True)
+    vehicle = serializers.StringRelatedField(read_only=True)
     
     # Campos para escritura
     delivery_person_id = serializers.PrimaryKeyRelatedField(
@@ -133,9 +140,9 @@ class DeliveryOfferSerializer(serializers.ModelSerializer):
         source='quote', 
         write_only=True
     )
-    vehicle_type_id = serializers.PrimaryKeyRelatedField(
-        queryset=VehicleType.objects.all(),
-        source='vehicle_type',
+    vehicle_id = serializers.PrimaryKeyRelatedField(
+        queryset=Vehicle.objects.all(),
+        source='vehicle',
         write_only=True,
         required=False
     )
@@ -144,9 +151,9 @@ class DeliveryOfferSerializer(serializers.ModelSerializer):
         model = DeliveryOffer
         fields = [
             'id', 'delivery_person', 'quote', 'proposed_price', 
-            'estimated_delivery_time', 'vehicle_type', 'status',
+            'estimated_delivery_time', 'vehicle', 'status',
             'created_at', 'updated_at',
-            'delivery_person_id', 'quote_id', 'vehicle_type_id'
+            'delivery_person_id', 'quote_id', 'vehicle_id'
         ]
         read_only_fields = ['status', 'created_at', 'updated_at']
 
