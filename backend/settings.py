@@ -46,6 +46,7 @@ LOCAL_APPS = [
 
 THIRD_APPS = [
     'rest_framework',
+    'channels',
 ]
 
 # CORS
@@ -92,6 +93,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'backend.wsgi.application'
+ASGI_APPLICATION = 'backend.asgi.application'
 
 
 # Database
@@ -173,3 +175,9 @@ CACHES = {
 }
 
 AUTH_USER_MODEL = 'users.User'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    }
+}

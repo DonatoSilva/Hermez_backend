@@ -70,7 +70,6 @@ class DeliveryQuote(models.Model):
         return f"Cotización {self.id} - {self.client}"
 
     def save(self, *args, **kwargs):
-        # Validation for addresses
         if not self.pickup_address and not self.pickup_address_text:
             raise ValueError("Debe proporcionar una dirección de recogida (ID o texto).")
         if not self.delivery_address and not self.delivery_address_text:
@@ -111,21 +110,7 @@ class DeliveryOffer(models.Model):
         return f"Oferta {self.id} - {self.delivery_person}"
 
     def save(self, *args, **kwargs):
-        # Establecer expiración por defecto (24 horas) si no se especifica
-        if not self.expires_at:
-            self.expires_at = timezone.now() + timezone.timedelta(hours=24)
         super().save(*args, **kwargs)
-
-    def is_expired(self):
-        """Verifica si la oferta ha expirado"""
-        return timezone.now() > self.expires_at
-
-    def deactivate(self):
-        """Desactiva la oferta"""
-        self.is_active = False
-        if self.status == 'pending':
-            self.status = 'expired'
-        self.save()
 
 
 class Delivery(models.Model):
@@ -150,7 +135,7 @@ class Delivery(models.Model):
     estimated_weight = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     estimated_size = models.CharField(max_length=100, blank=True, null=True)
     final_price = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='assigned')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(null=True, blank=True)

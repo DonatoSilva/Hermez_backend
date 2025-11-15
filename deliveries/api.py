@@ -67,7 +67,7 @@ class DeliveryOfferViewSet(viewsets.ModelViewSet):
             estimated_weight=offer.quote.estimated_weight,
             estimated_size=offer.quote.estimated_size,
             final_price=offer.proposed_price,
-            status='pending'
+            status='assigned'
         )
         
         # Actualizar estados
