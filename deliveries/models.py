@@ -2,7 +2,6 @@ from django.db import models
 from django.utils import timezone
 import uuid
 from users.models import User
-from addresses.models import Address
 
 # Create your models here.
 class DeliveryCategory(models.Model):
@@ -41,13 +40,11 @@ class DeliveryQuote(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='delivery_quotes')
-    pickup_address = models.ForeignKey(Address, on_delete=models.SET_NULL, related_name='pickup_quotes', null=True, blank=True)
-    pickup_address_text = models.CharField(max_length=255, blank=True, null=True)
-    delivery_address = models.ForeignKey(Address, on_delete=models.SET_NULL, related_name='delivery_quotes', null=True, blank=True)
-    delivery_address_text = models.CharField(max_length=255, blank=True, null=True)
+    pickup_address = models.TextField(blank=True)
+    delivery_address = models.TextField(blank=True)
     category = models.ForeignKey(DeliveryCategory, on_delete=models.CASCADE)
     description = models.TextField(blank=True, null=True)
-    observations = models.TextField(blank=True, null=True)
+    observations = models.JSONField(default=list, blank=True)
     estimated_weight = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     estimated_size = models.CharField(max_length=100, blank=True, null=True)
     client_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -70,10 +67,6 @@ class DeliveryQuote(models.Model):
         return f"Cotización {self.id} - {self.client}"
 
     def save(self, *args, **kwargs):
-        if not self.pickup_address and not self.pickup_address_text:
-            raise ValueError("Debe proporcionar una dirección de recogida (ID o texto).")
-        if not self.delivery_address and not self.delivery_address_text:
-            raise ValueError("Debe proporcionar una dirección de entrega (ID o texto).")
         super().save(*args, **kwargs)
 
 
@@ -128,8 +121,8 @@ class Delivery(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='deliveries')
     delivery_person = models.ForeignKey(User, on_delete=models.CASCADE, related_name='assigned_deliveries', null=True, blank=True)
-    pickup_address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name='pickup_deliveries')
-    delivery_address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name='delivery_deliveries')
+    pickup_address = models.TextField()
+    delivery_address = models.TextField()
     category = models.ForeignKey(DeliveryCategory, on_delete=models.CASCADE)
     description = models.TextField(blank=True, null=True)
     estimated_weight = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)

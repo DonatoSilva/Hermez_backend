@@ -1,9 +1,7 @@
 from rest_framework import serializers
 from .models import DeliveryCategory, DeliveryQuote, DeliveryOffer, Delivery, DeliveryHistory
 from users.serializers import UserSerializer
-from addresses.serializers import AddressSerializer
 from users.models import User
-from addresses.models import Address
 from vehicles.models import VehicleType
 
 class DeliveryCategorySerializer(serializers.ModelSerializer):
@@ -15,8 +13,6 @@ class DeliveryCategorySerializer(serializers.ModelSerializer):
 class DeliveryQuoteSerializer(serializers.ModelSerializer):
     """Serializer para cotizaciones de entrega con campos de solo lectura"""
     client = UserSerializer(read_only=True)
-    pickup_address = AddressSerializer(read_only=True)
-    delivery_address = AddressSerializer(read_only=True)
     category = serializers.StringRelatedField(read_only=True)
     
     # Campos para escritura
@@ -25,32 +21,21 @@ class DeliveryQuoteSerializer(serializers.ModelSerializer):
         source='client', 
         write_only=True
     )
-    pickup_address_id = serializers.PrimaryKeyRelatedField(
-        queryset=Address.objects.all(), 
-        source='pickup_address', 
-        write_only=True,
-        required=False
-    )
-    delivery_address_id = serializers.PrimaryKeyRelatedField(
-        queryset=Address.objects.all(), 
-        source='delivery_address', 
-        write_only=True,
-        required=False
-    )
     category_id = serializers.PrimaryKeyRelatedField(
         queryset=DeliveryCategory.objects.all(), 
         source='category', 
         write_only=True
     )
+    observations = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
 
     class Meta:
         model = DeliveryQuote
         fields = [
             'id', 'client', 'pickup_address', 'delivery_address', 'category',
-            'pickup_address_text', 'delivery_address_text', 'description', 'observations',
+            'description', 'observations',
             'estimated_weight', 'estimated_size', 'client_price', 'payment_method',
             'status', 'history_id',
-            'client_id', 'pickup_address_id', 'delivery_address_id', 'category_id'
+            'client_id', 'category_id'
         ]
         read_only_fields = ['status', 'history_id']
 
@@ -60,10 +45,9 @@ class DeliveryQuoteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("El precio debe ser mayor a cero")
         
         # Validar que pickup y delivery sean direcciones diferentes
-        pickup_address = data.get('pickup_address')
-        delivery_address = data.get('delivery_address')
-        
-        if pickup_address and delivery_address and pickup_address.id == delivery_address.id:
+        pickup_address = (data.get('pickup_address') or '').strip()
+        delivery_address = (data.get('delivery_address') or '').strip()
+        if pickup_address and delivery_address and pickup_address == delivery_address:
             raise serializers.ValidationError("Las direcciones de recogida y entrega deben ser diferentes")
         
         return data
@@ -73,8 +57,6 @@ class DeliverySerializer(serializers.ModelSerializer):
     """Serializer para domicilios permanentes"""
     client = UserSerializer(read_only=True)
     delivery_person = UserSerializer(read_only=True)
-    pickup_address = AddressSerializer(read_only=True)
-    delivery_address = AddressSerializer(read_only=True)
     category = serializers.StringRelatedField(read_only=True)
     
     # Campos para escritura
@@ -89,16 +71,6 @@ class DeliverySerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
-    pickup_address_id = serializers.PrimaryKeyRelatedField(
-        queryset=Address.objects.all(), 
-        source='pickup_address', 
-        write_only=True
-    )
-    delivery_address_id = serializers.PrimaryKeyRelatedField(
-        queryset=Address.objects.all(), 
-        source='delivery_address', 
-        write_only=True
-    )
     category_id = serializers.PrimaryKeyRelatedField(
         queryset=DeliveryCategory.objects.all(), 
         source='category', 
@@ -111,7 +83,7 @@ class DeliverySerializer(serializers.ModelSerializer):
             'id', 'client', 'delivery_person', 'pickup_address', 'delivery_address', 'category',
             'description', 'estimated_weight', 'estimated_size', 'final_price', 'status',
             'created_at', 'updated_at', 'completed_at', 'cancelled_at',
-            'client_id', 'delivery_person_id', 'pickup_address_id', 'delivery_address_id', 'category_id'
+            'client_id', 'delivery_person_id', 'category_id'
         ]
         read_only_fields = ['status', 'created_at', 'updated_at', 'completed_at', 'cancelled_at']
 
@@ -121,10 +93,9 @@ class DeliverySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("El precio final debe ser mayor a cero")
         
         # Validar que pickup y delivery sean direcciones diferentes
-        pickup_address = data.get('pickup_address')
-        delivery_address = data.get('delivery_address')
-        
-        if pickup_address and delivery_address and pickup_address.id == delivery_address.id:
+        pickup_address = (data.get('pickup_address') or '').strip()
+        delivery_address = (data.get('delivery_address') or '').strip()
+        if pickup_address and delivery_address and pickup_address == delivery_address:
             raise serializers.ValidationError("Las direcciones de recogida y entrega deben ser diferentes")
         
         return data
