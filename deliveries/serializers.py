@@ -34,10 +34,10 @@ class DeliveryQuoteSerializer(serializers.ModelSerializer):
             'id', 'client', 'pickup_address', 'delivery_address', 'category',
             'description', 'observations',
             'estimated_weight', 'estimated_size', 'client_price', 'payment_method',
-            'status', 'history_id',
+            'status', 'history_id', 'expires_at',
             'client_id', 'category_id'
         ]
-        read_only_fields = ['status', 'history_id']
+        read_only_fields = ['status', 'history_id', 'expires_at']
 
     def validate(self, data):
         """Validación personalizada para la cotización"""
@@ -152,10 +152,10 @@ class DeliveryOfferSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'delivery_person', 'quote', 'proposed_price', 
             'estimated_delivery_time', 'vehicle', 'status',
-            'created_at', 'updated_at',
+            'created_at', 'updated_at', 'expires_at',
             'delivery_person_id', 'quote_id', 'vehicle_id'
         ]
-        read_only_fields = ['status', 'created_at', 'updated_at']
+        read_only_fields = ['status', 'created_at', 'updated_at', 'expires_at']
 
     def validate(self, data):
         """Validación personalizada para la oferta"""

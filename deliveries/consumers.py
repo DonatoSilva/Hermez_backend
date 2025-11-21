@@ -102,11 +102,12 @@ class DeliveryConsumer(JsonWebsocketConsumer):
 
         # Debug/logging: mostrar subprotocols y resultado de autenticación (remover en producción)
         # Logs de diagnóstico: mostrar auth_result, variable local 'user' y scope['user']
+        local_user = user if ('user' in locals()) else None
         try:
             print("WS subprotocols:", subprotocols)
             print("Resolved token:", token_key)
             try:
-                print("Local authenticated user (variable 'user'):", repr(user))
+                print("Local authenticated user (variable 'user'):", repr(local_user))
             except Exception:
                 pass
             try:

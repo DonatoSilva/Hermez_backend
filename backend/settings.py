@@ -184,3 +184,7 @@ CHANNEL_LAYERS = {
         },
     }
 }
+
+# Duraciones por defecto para cotizaciones y ofertas (en minutos)
+DELIVERIES_QUOTE_TTL_MINUTES = 10
+DELIVERIES_OFFER_TTL_MINUTES = 4

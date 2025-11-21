@@ -1,3 +1,5 @@
+from datetime import timedelta
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 import uuid
@@ -53,6 +55,7 @@ class DeliveryQuote(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
 
     created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     history_id = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)  # ID único para todo el ciclo de vida
 
@@ -68,7 +71,21 @@ class DeliveryQuote(models.Model):
         return f"Cotización {self.id} - {self.client}"
 
     def save(self, *args, **kwargs):
+        if not self.expires_at:
+            ttl_minutes = getattr(settings, 'DELIVERIES_QUOTE_TTL_MINUTES', 10)
+            self.expires_at = timezone.now() + timedelta(minutes=ttl_minutes)
         super().save(*args, **kwargs)
+
+    def extend_expiration(self, minutes):
+        if minutes <= 0:
+            raise ValueError("Los minutos adicionales deben ser mayores a cero")
+        base = self.expires_at or timezone.now()
+        self.expires_at = base + timedelta(minutes=minutes)
+        self.save(update_fields=['expires_at'])
+
+    @property
+    def is_expired(self):
+        return self.expires_at is not None and self.expires_at <= timezone.now()
 
 
 class DeliveryOffer(models.Model):
@@ -90,6 +107,7 @@ class DeliveryOffer(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
 
     class Meta:
         verbose_name = "Oferta de Domiciliario"
@@ -104,7 +122,21 @@ class DeliveryOffer(models.Model):
         return f"Oferta {self.id} - {self.delivery_person}"
 
     def save(self, *args, **kwargs):
+        if not self.expires_at:
+            ttl_minutes = getattr(settings, 'DELIVERIES_OFFER_TTL_MINUTES', 4)
+            self.expires_at = timezone.now() + timedelta(minutes=ttl_minutes)
         super().save(*args, **kwargs)
+
+    def extend_expiration(self, minutes):
+        if minutes <= 0:
+            raise ValueError("Los minutos adicionales deben ser mayores a cero")
+        base = self.expires_at or timezone.now()
+        self.expires_at = base + timedelta(minutes=minutes)
+        self.save(update_fields=['expires_at'])
+
+    @property
+    def is_expired(self):
+        return self.expires_at is not None and self.expires_at <= timezone.now()
 
 
 class Delivery(models.Model):

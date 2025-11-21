@@ -3,6 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import DeliveryQuote, DeliveryOffer, DeliveryCategory, Delivery, DeliveryHistory
 from .serializers import DeliveryQuoteSerializer, DeliveryOfferSerializer, DeliveryCategorySerializer, DeliverySerializer, DeliveryHistorySerializer
+from deliveries.services.expiration import expire_quote_by_id
 
 class DeliveryCategoryViewSet(viewsets.ModelViewSet):
     queryset = DeliveryCategory.objects.all()
@@ -127,11 +128,46 @@ class DeliveryOfferViewSet(viewsets.ModelViewSet):
         
         return Response({'status': 'Oferta rechazada'})
 
+    @action(detail=True, methods=['post'], url_path='extend-expiration')
+    def extend_expiration(self, request, pk=None):
+        """Permite extender el tiempo de vida de una oferta pendiente."""
+        offer = self.get_object()
+
+        if offer.status != 'pending':
+            return Response({'error': 'Solo se pueden extender ofertas pendientes'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            minutes = int(request.data.get('minutes') or request.data.get('extra_minutes'))
+        except (TypeError, ValueError):
+            return Response({'error': 'Debe proporcionar "minutes" como entero positivo'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            offer.extend_expiration(minutes)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(offer)
+        return Response({'status': 'extendido', 'expires_at': serializer.data['expires_at']})
+
 
 class DeliveryQuoteViewSet(viewsets.ModelViewSet):
     queryset = DeliveryQuote.objects.all()
     serializer_class = DeliveryQuoteSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    @action(detail=True, methods=['get'], url_path='offers')
+    def offers(self, request, pk=None):
+        """Lista las ofertas asociadas a esta cotización.
+
+        Permite filtrar por ?status=pending|accepted|rejected
+        """
+        quote = self.get_object()
+        qs = quote.offers.all()
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        serializer = DeliveryOfferSerializer(qs, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
@@ -157,6 +193,49 @@ class DeliveryQuoteViewSet(viewsets.ModelViewSet):
         quote.delete()
         
         return Response({'status': 'Cotización cancelada y eliminada'})
+
+    @action(detail=True, methods=['post'], url_path='extend-expiration')
+    def extend_expiration(self, request, pk=None):
+        """Extiende el tiempo de vida de una cotización pendiente"""
+        quote = self.get_object()
+
+        if quote.status != 'pending':
+            return Response({'error': 'Solo se pueden extender cotizaciones pendientes'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            minutes = int(request.data.get('minutes') or request.data.get('extra_minutes'))
+        except (TypeError, ValueError):
+            return Response({'error': 'Debe proporcionar "minutes" como entero positivo'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            quote.extend_expiration(minutes)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(quote)
+        return Response({'status': 'extendido', 'expires_at': serializer.data['expires_at']})
+
+    @action(detail=True, methods=['post'], url_path='expire-now')
+    def expire_now(self, request, pk=None):
+        """Forzar expiración inmediata de una cotización 'pending'.
+
+        Permisos: dueño de la cotización (client) o staff.
+        """
+        quote = self.get_object()
+        user = request.user
+
+        if not (user.is_staff or user == quote.client):
+            return Response({'error': 'No autorizado'}, status=status.HTTP_403_FORBIDDEN)
+
+        if quote.status != 'pending':
+            return Response({'error': 'Solo se pueden expirar cotizaciones en estado pendiente'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        ok = expire_quote_by_id(quote.id)
+        if not ok:
+            return Response({'error': 'No fue posible expirar la cotización'}, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'status': 'expired', 'quote_id': str(quote.id)})
 
 
 class DeliveryHistoryViewSet(viewsets.ReadOnlyModelViewSet):
