@@ -21,20 +21,10 @@ try:
     from deliveries.routing import websocket_urlpatterns
 except Exception:
     import traceback
-    print("Error importing deliveries.routing.websocket_urlpatterns:")
     traceback.print_exc()
     websocket_urlpatterns = []
 else:
-    try:
-        # Mostrar las rutas WebSocket cargadas para depuración
-        print("Loaded websocket_urlpatterns:")
-        for p in websocket_urlpatterns:
-            try:
-                print(' -', getattr(p, 'pattern', p))
-            except Exception:
-                print(' -', p)
-    except Exception:
-        pass
+   pass
 
 application = ProtocolTypeRouter({
     'http': django_app,

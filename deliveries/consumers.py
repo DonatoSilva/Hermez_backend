@@ -54,20 +54,20 @@ class DeliveryConsumer(JsonWebsocketConsumer):
                     clerk_auth = ClerkAuthentication()
                     auth_result = clerk_auth.authenticate(_FakeRequest(token_key))
                     try:
-                        print("ClerkAuthentication auth_result:", repr(auth_result))
+                        pass
                     except Exception:
                         pass
                     if auth_result:
                         user = auth_result[0]
                 except Exception as exc:
                     try:
-                        print("ClerkAuthentication error:", repr(exc))
+                        pass
                     except Exception:
                         pass
                     user = None
             except Exception:
                 try:
-                    print("Failed to import ClerkAuthentication:")
+                    pass
                 except Exception:
                     pass
                 user = None
@@ -104,16 +104,14 @@ class DeliveryConsumer(JsonWebsocketConsumer):
         # Logs de diagnóstico: mostrar auth_result, variable local 'user' y scope['user']
         local_user = user if ('user' in locals()) else None
         try:
-            print("WS subprotocols:", subprotocols)
-            print("Resolved token:", token_key)
+
             try:
-                print("Local authenticated user (variable 'user'):", repr(local_user))
+                pass
             except Exception:
                 pass
             try:
                 u = self.scope.get('user')
-                print("Scope user object:", repr(u))
-                print("Scope user.userid:", getattr(u, 'userid', None))
+                pass
             except Exception:
                 pass
         except Exception:
@@ -127,7 +125,7 @@ class DeliveryConsumer(JsonWebsocketConsumer):
         current_user = user if ('user' in locals() and user is not None) else None
         if token_key and (current_user is None or isinstance(current_user, AnonymousUser)):
             try:
-                print("WebSocket auth failed for token, closing connection")
+                ("WebSocket auth failed for token, closing connection")
             except Exception:
                 pass
             self.close()
@@ -195,18 +193,18 @@ class DeliveryConsumer(JsonWebsocketConsumer):
                         if isinstance(exc_inner, ClientDisconnected):
                             return
                         try:
-                            print("Error al enviar initial_quotes:", repr(exc_inner))
+                            pass
                         except Exception:
                             pass
                 else:
                     # Si no podemos identificar ClientDisconnected, loguear el error
                     try:
-                        print("Error enviando quotes iniciales: cliente desconectado o envío falló")
+                        pass
                     except Exception:
                         pass
         except Exception as e:
             try:
-                print("Error preparando/enviando quotes iniciales:", repr(e))
+                pass
             except Exception:
                 pass
 

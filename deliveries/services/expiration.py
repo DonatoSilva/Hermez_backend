@@ -39,8 +39,8 @@ def expire_quote_by_id(quote_id):
     quote.delete()
 
     # Enviar los mismos eventos que la expiración programada
-    _broadcast('new_quotes', {'type': 'quote.expired', 'data': payload})
-    _broadcast(f'quote_{quote_id_str}', {'type': 'quote.expired', 'data': payload})
+    _broadcast('new_quotes', {'type': 'quote_expired', 'data': payload})
+    _broadcast(f'quote_{quote_id_str}', {'type': 'quote_expired', 'data': payload})
     return True
 
 
@@ -56,8 +56,8 @@ def _collect_expired_quotes():
     if count:
         queryset.delete()
         for quote_id, payload in payloads:
-            _broadcast('new_quotes', {'type': 'quote.expired', 'data': payload})
-            _broadcast(f'quote_{quote_id}', {'type': 'quote.expired', 'data': payload})
+            _broadcast('new_quotes', {'type': 'quote_expired', 'data': payload})
+            _broadcast(f'quote_{quote_id}', {'type': 'quote_expired', 'data': payload})
     return count
 
 

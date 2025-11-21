@@ -36,7 +36,6 @@ class UserViewSet(viewsets.ModelViewSet):
             serializer.save()
             return Response({'message': f'User {user.userid} updated successfully'}, status=status.HTTP_200_OK)
         else:
-            print(serializer.errors)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def destroy(self, request, *args, **kwargs):

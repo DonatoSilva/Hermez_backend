@@ -17,10 +17,8 @@ def clerk_webhook(request):
         wh = Webhook(settings.CLERK_WEBHOOK_SIGNING_SECRET)
         payload = wh.verify(request.body, request.headers)
     except WebhookVerificationError as e:
-        print(f"Error al verificar el webhook de Clerk: {e}")
         return HttpResponse(status=400)
     except Exception as e:
-        print(f"Error inesperado en el webhook de Clerk: {e}")
         return HttpResponse(status=500)
 
     # 2. Procesamiento del evento
@@ -30,7 +28,6 @@ def clerk_webhook(request):
     if not event_type or not data:
         return HttpResponse(status=400)
 
-    print(f"Webhook de Clerk recibido: {event_type}")
 
     # 3. Lógica para cada tipo de evento
     if event_type == "user.created":
