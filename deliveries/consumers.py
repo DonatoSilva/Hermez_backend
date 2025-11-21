@@ -1,5 +1,7 @@
 from channels.generic.websocket import JsonWebsocketConsumer
 from asgiref.sync import async_to_sync
+from .models import DeliveryQuote
+from .serializers import DeliveryQuoteSerializer
 
 class DeliveryConsumer(JsonWebsocketConsumer):
     def connect(self):
@@ -19,6 +21,16 @@ class DeliveryConsumer(JsonWebsocketConsumer):
 
         async_to_sync(self.channel_layer.group_add)(self.group_name, self.channel_name)
         self.accept()
+
+        # Enviar quotes existentes (por ejemplo, status pending) al cliente que conecta
+        try:
+            qs = DeliveryQuote.objects.filter(status="pending")
+            initial = DeliveryQuoteSerializer(qs, many=True).data
+            self.send_json({"type": "initial_quotes", "quotes": initial})
+        except Exception as e:
+            print("Error enviando quotes iniciales: ", e)
+            # no detener la conexión si algo falla
+            pass
 
     def disconnect(self, close_code):
         if hasattr(self, 'group_name'):

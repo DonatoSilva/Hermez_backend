@@ -13,11 +13,11 @@ def on_quote_created(sender, instance, created, **kwargs):
         data = DeliveryQuoteSerializer(instance).data
         async_to_sync(channel_layer.group_send)(
             'new_quotes',
-            {'type': 'broadcast', 'data': {'type': 'quote.created', 'data': data}}
+            {'type': 'broadcast', 'data': {'type': 'quote_created', 'data': data}}
         )
         async_to_sync(channel_layer.group_send)(
             f'quote_{instance.id}',
-            {'type': 'broadcast', 'data': {'type': 'quote.created', 'data': data}}
+            {'type': 'broadcast', 'data': {'type': 'quote_created', 'data': data}}
         )
 
 @receiver(post_save, sender=DeliveryOffer)

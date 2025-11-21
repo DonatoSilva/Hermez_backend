@@ -40,8 +40,8 @@ class DeliveryQuote(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     client = models.ForeignKey(User, on_delete=models.CASCADE, related_name='delivery_quotes')
-    pickup_address = models.TextField(blank=True)
-    delivery_address = models.TextField(blank=True)
+    pickup_address = models.TextField(null=False, blank=False)
+    delivery_address = models.TextField(null=False, blank=False)
     category = models.ForeignKey(DeliveryCategory, on_delete=models.CASCADE)
     description = models.TextField(blank=True, null=True)
     observations = models.JSONField(default=list, blank=True)
