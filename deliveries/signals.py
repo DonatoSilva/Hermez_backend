@@ -23,7 +23,7 @@ def on_quote_created(sender, instance, created, **kwargs):
 @receiver(post_save, sender=DeliveryOffer)
 def on_offer_saved(sender, instance, created, **kwargs):
     data = DeliveryOfferSerializer(instance).data
-    event_type = 'offer.made' if created else 'offer.updated'
+    event_type = 'offer_made' if created else 'offer_updated'
     async_to_sync(channel_layer.group_send)(
         f'quote_{instance.quote.id}',
         {'type': 'broadcast', 'data': {'type': event_type, 'data': data}}

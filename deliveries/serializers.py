@@ -3,6 +3,7 @@ from .models import DeliveryCategory, DeliveryQuote, DeliveryOffer, Delivery, De
 from users.serializers import UserSerializer
 from users.models import User
 from vehicles.models import VehicleType, Vehicle
+from django.utils import timezone
 
 class DeliveryCategorySerializer(serializers.ModelSerializer):
     class Meta:
@@ -14,6 +15,8 @@ class DeliveryQuoteSerializer(serializers.ModelSerializer):
     """Serializer para cotizaciones de entrega con campos de solo lectura"""
     client = UserSerializer(read_only=True)
     category = serializers.StringRelatedField(read_only=True)
+
+    
     
     # Campos para escritura
     client_id = serializers.PrimaryKeyRelatedField(
@@ -128,6 +131,7 @@ class DeliveryOfferSerializer(serializers.ModelSerializer):
     delivery_person = UserSerializer(read_only=True)
     quote = DeliveryQuoteSerializer(read_only=True)
     vehicle = serializers.StringRelatedField(read_only=True)
+    can_accept = serializers.SerializerMethodField(read_only=True)
     
     # Campos para escritura
     delivery_person_id = serializers.PrimaryKeyRelatedField(
@@ -153,9 +157,9 @@ class DeliveryOfferSerializer(serializers.ModelSerializer):
             'id', 'delivery_person', 'quote', 'proposed_price', 
             'estimated_delivery_time', 'vehicle', 'status',
             'created_at', 'updated_at', 'expires_at',
-            'delivery_person_id', 'quote_id', 'vehicle_id'
+            'delivery_person_id', 'quote_id', 'vehicle_id', 'can_accept'
         ]
-        read_only_fields = ['status', 'created_at', 'updated_at', 'expires_at']
+        read_only_fields = ['status', 'created_at', 'updated_at', 'expires_at', 'can_accept']
 
     def validate(self, data):
         """Validación personalizada para la oferta"""
@@ -166,7 +170,32 @@ class DeliveryOfferSerializer(serializers.ModelSerializer):
         delivery_person = data.get('delivery_person')
         quote = data.get('quote')
         
-        if delivery_person and quote and delivery_person.id == quote.client.id:
-            raise serializers.ValidationError("El domiciliario no puede ser el mismo cliente")
+        """ if delivery_person and quote and delivery_person.id == quote.client.id:
+            raise serializers.ValidationError("El domiciliario no puede ser el mismo cliente") """
         
         return data
+
+    def get_can_accept(self, obj):
+        """
+        True si el request.user es el cliente de la quote y tanto quote como offer están pendientes
+        y no expiradas.
+        """
+        request = self.context.get('request') if isinstance(self.context, dict) else None
+        if not request or not getattr(request, 'user', None) or request.user.is_anonymous:
+            return False
+
+        user_pk = getattr(request.user, 'pk', None)  # usar pk/id estándar
+
+        try:
+            if obj.quote is None:
+                return False
+            if obj.quote.status != 'pending' or obj.status != 'pending':
+                return False
+            if obj.quote.expires_at and obj.quote.expires_at <= timezone.now():
+                return False
+            if obj.expires_at and obj.expires_at <= timezone.now():
+                return False
+            # comparar client_id directo con el pk del request.user
+            return obj.quote.client_id == user_pk
+        except Exception:
+            return False
