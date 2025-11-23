@@ -30,20 +30,38 @@ def clerk_webhook(request):
 
 
     # 3. Lógica para cada tipo de evento
-    if event_type == "user.created":
-        # Lógica para crear un nuevo usuario
-        pass
-    elif event_type == "user.updated":
-        # Lógica para actualizar un usuario existente
-        pass
-    elif event_type == "user.deleted":
-        # Lógica para desactivar o eliminar un usuario
-        pass
-    elif event_type in ["organizationMembership.created", "organizationMembership.updated"]:
-        # Lógica para actualizar el rol del usuario
-        pass
-    elif event_type == "organizationMembership.deleted":
-        # Lógica para quitar el rol del usuario
-        pass
+    try:
+        if event_type in ["user.created", "user.updated"]:
+            user_id = data.get("id")
+            email_addresses = data.get("email_addresses", [])
+            primary_email_id = data.get("primary_email_address_id")
+            
+            email = ""
+            for email_obj in email_addresses:
+                if email_obj.get("id") == primary_email_id:
+                    email = email_obj.get("email_address", "")
+                    break
+            
+            # Si no se encontró el primario, usar el primero disponible
+            if not email and email_addresses:
+                email = email_addresses[0].get("email_address", "")
+
+            defaults = {
+                "first_name": data.get("first_name", ""),
+                "last_name": data.get("last_name", ""),
+                "image_url": data.get("image_url", ""),
+                "email": email,
+            }
+
+            User.objects.update_or_create(userid=user_id, defaults=defaults)
+
+        elif event_type == "user.deleted":
+            user_id = data.get("id")
+            User.objects.filter(userid=user_id).update(is_active=False)
+            
+
+    except Exception as e:
+        print(f"Error processing webhook: {e}")
+        return HttpResponse(status=500)
 
     return HttpResponse(status=200)

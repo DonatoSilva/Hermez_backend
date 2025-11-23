@@ -13,8 +13,8 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ('userid', 'gender', 'phone', 'age', 'role', 'is_online', 'is_available', 'current_vehicle', 'current_vehicle_id')
-        read_only_fields = ('userid',)
+        fields = ('userid', 'first_name', 'last_name', 'email', 'image_url', 'gender', 'phone', 'age', 'role', 'is_online', 'is_available', 'current_vehicle', 'current_vehicle_id')
+        read_only_fields = ('userid', 'email', 'image_url')
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

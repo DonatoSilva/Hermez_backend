@@ -46,18 +46,6 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
         return super().destroy(request, *args, **kwargs)
 
-
-    @action(detail=False, methods=['delete'], url_path='delete', url_name='delete-user')
-    def delete_user(self, request):
-        """
-        DELETE /api/me/delete/ -> elimina el perfil del usuario autenticado
-        """
-        try:
-            user = request.user
-            user.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
         
     @action(detail=True, methods=['get'], url_path='ratings')
     def ratings(self, request, pk=None):

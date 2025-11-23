@@ -26,6 +26,12 @@ class User(models.Model):
         related_name='active_drivers'
     )
 
+    # Campos sincronizados desde Clerk
+    first_name = models.CharField(max_length=150, blank=True, null=True)
+    last_name = models.CharField(max_length=150, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    image_url = models.URLField(max_length=500, blank=True, null=True)
+
     # Campo de contraseña requerido por Django, pero no usado por Clerk
     password = models.CharField(max_length=128, blank=True, null=True)
 
@@ -50,10 +56,11 @@ class User(models.Model):
         return False # Los usuarios de Clerk no son superusuarios por defecto
 
     def get_full_name(self):
-        return self.userid # O cualquier otro campo que quieras usar como nombre completo
+        full_name = f"{self.first_name or ''} {self.last_name or ''}".strip()
+        return full_name if full_name else self.userid
 
     def get_short_name(self):
-        return self.userid # O cualquier otro campo que quieras usar como nombre corto
+        return self.first_name or self.userid
 
     @property
     def is_anonymous(self):

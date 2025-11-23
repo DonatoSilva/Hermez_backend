@@ -11,6 +11,10 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -20,12 +24,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-ely*z!5(q#)us=y-irm7*a-2xk*++=+4%@5ab!_so(t2s#mxyb'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-ely*z!5(q#)us=y-irm7*a-2xk*++=+4%@5ab!_so(t2s#mxyb')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
 
 
 BASE_APPS = [
@@ -70,7 +74,7 @@ MIDDLEWARE = [
 # CORS settings
 # Permitir solicitudes desde el frontend en http://localhost:4321 y permitir credenciales (cookies, auth headers)
 CORS_ALLOWED_ORIGINS = [
-    'http://localhost:4321',
+    u.strip() for u in os.environ.get('DJANGO_CORS_ALLOWED_ORIGINS', 'http://localhost:4321').split(',') if u.strip()
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -154,7 +158,7 @@ CLERK_JWT_AUDIENCE = 'hermez-backend-api'
 CLERK_JWT_ISSUER = CLERK_FRONTEND_API_URL
 
 # Clerk Webhook Signing Secret
-CLERK_WEBHOOK_SIGNING_SECRET = "tu_signing_secret_de_clerk"
+CLERK_WEBHOOK_SIGNING_SECRET = os.environ.get('CLERK_WEBHOOK_SIGNING_SECRET', "tu_signing_secret_de_clerk")
 
 # Django REST Framework Settings
 REST_FRAMEWORK = {

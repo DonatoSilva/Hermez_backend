@@ -55,14 +55,47 @@ class ClerkAuthentication(BaseAuthentication):
             if not user_id:
                 raise AuthenticationFailed('Token inválido: falta el ID de usuario.')
 
-            # Aquí puedes buscar o crear el usuario en tu base de datos
-            # Por ahora, solo devolvemos un usuario ficticio o el ID de Clerk
-            from .models import User # Asumiendo que tienes un modelo User
+            # Extraer datos adicionales del token (si están configurados en Clerk)
+            first_name = decoded_token.get('first_name', '')
+            last_name = decoded_token.get('last_name', '')
+            image_url = decoded_token.get('image_url', '')
+            email = decoded_token.get('email', '')
+
+            from .models import User
+            # Buscar o crear usuario
             try:
                 user = User.objects.get(userid=user_id)
+                
+                print("Usuario encontrado en la base de datos:", user)
+                
+                # Fallback: Actualizar si los datos del token son más recientes/diferentes
+                # Esto es útil si el webhook falló o aún no ha llegado
+                needs_save = False
+                if first_name and user.first_name != first_name:
+                    user.first_name = first_name
+                    needs_save = True
+                if last_name and user.last_name != last_name:
+                    user.last_name = last_name
+                    needs_save = True
+                if image_url and user.image_url != image_url:
+                    user.image_url = image_url
+                    needs_save = True
+                if email and user.email != email:
+                    user.email = email
+                    needs_save = True
+                
+                if needs_save:
+                    user.save()
+
             except User.DoesNotExist:
-                # Si el usuario no existe en tu DB, puedes crearlo o levantar un error
-                user = User.objects.create(userid=user_id)
+                # Crear usuario con todos los datos disponibles
+                user = User.objects.create(
+                    userid=user_id,
+                    first_name=first_name,
+                    last_name=last_name,
+                    image_url=image_url,
+                    email=email
+                )
             
             return (user, token)
 
