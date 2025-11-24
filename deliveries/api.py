@@ -15,6 +15,25 @@ class DeliveryViewSet(viewsets.ModelViewSet):
     serializer_class = DeliverySerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    @action(detail=True, methods=['get'])
+    def history(self, request, pk=None):
+        """Obtener el domicilio con todo su historial de eventos"""
+        delivery = self.get_object()
+        
+        # Obtener el historial usando el history_id
+        history_events = DeliveryHistory.objects.filter(
+            history_id=delivery.history_id
+        ).order_by('created_at')
+        
+        # Serializar
+        delivery_data = DeliverySerializer(delivery).data
+        history_data = DeliveryHistorySerializer(history_events, many=True).data
+        
+        return Response({
+            'delivery': delivery_data,
+            'history': history_data
+        })
+
     @action(detail=True, methods=['post'])
     def change_status(self, request, pk=None):
         """Cambiar el estado de un domicilio y registrar en el historial"""
@@ -252,21 +271,3 @@ class DeliveryQuoteViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(quote)
         return Response({'status': 'extendido', 'expires_at': serializer.data['expires_at']})
-
-
-class DeliveryHistoryViewSet(viewsets.ReadOnlyModelViewSet):
-    """API para consultar el historial de eventos de domicilios usando history_id"""
-    serializer_class = DeliveryHistorySerializer
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get_queryset(self):
-        queryset = DeliveryHistory.objects.all()
-        
-        # Filtrar por history_id - el ID único que conecta todo el ciclo de vida
-        history_id = self.request.query_params.get('history_id')
-        if history_id:
-            # Buscar eventos con este history_id
-            queryset = queryset.filter(history_id=history_id)
-            return queryset.order_by('created_at')
-            
-        return queryset.order_by('created_at')
