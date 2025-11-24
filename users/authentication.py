@@ -48,8 +48,7 @@ class ClerkAuthentication(BaseAuthentication):
                 algorithms=['RS256'],
                 audience=expected_audience,
                 issuer=expected_issuer,
-                options={"verify_signature": True},
-                leeway=300
+                options={"verify_signature": True}
             )
 
             user_id = decoded_token.get('sub')
