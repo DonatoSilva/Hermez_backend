@@ -48,7 +48,8 @@ class ClerkAuthentication(BaseAuthentication):
                 algorithms=['RS256'],
                 audience=expected_audience,
                 issuer=expected_issuer,
-                options={"verify_signature": True}
+                options={"verify_signature": True},
+                leeway=300
             )
 
             user_id = decoded_token.get('sub')
@@ -58,6 +59,7 @@ class ClerkAuthentication(BaseAuthentication):
             # Extraer datos adicionales del token (si están configurados en Clerk)
             first_name = decoded_token.get('first_name', '')
             last_name = decoded_token.get('last_name', '')
+            username = decoded_token.get('username', '')
             image_url = decoded_token.get('image_url', '')
             email = decoded_token.get('email', '')
 
@@ -75,6 +77,9 @@ class ClerkAuthentication(BaseAuthentication):
                 if last_name and user.last_name != last_name:
                     user.last_name = last_name
                     needs_save = True
+                if username and user.username != username:
+                    user.username = username
+                    needs_save = True
                 if image_url and user.image_url != image_url:
                     user.image_url = image_url
                     needs_save = True
@@ -91,6 +96,7 @@ class ClerkAuthentication(BaseAuthentication):
                     userid=user_id,
                     first_name=first_name,
                     last_name=last_name,
+                    username=username,
                     image_url=image_url,
                     email=email
                 )

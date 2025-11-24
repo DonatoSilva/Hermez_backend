@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import User, UserRating
 
 class UserSerializer(serializers.ModelSerializer):
-    current_vehicle = serializers.StringRelatedField(read_only=True)
+    current_vehicle = serializers.SerializerMethodField(read_only=True)
     current_vehicle_id = serializers.PrimaryKeyRelatedField(
         source='current_vehicle',
         queryset=User.objects.none(),  # Se actualizará en __init__
@@ -13,8 +13,15 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ('userid', 'first_name', 'last_name', 'email', 'image_url', 'gender', 'phone', 'age', 'role', 'is_online', 'is_available', 'current_vehicle', 'current_vehicle_id')
+        fields = ('userid', 'username', 'first_name', 'last_name', 'email', 'image_url', 'gender', 'phone', 'age', 'role', 'is_online', 'is_available', 'current_vehicle', 'current_vehicle_id')
         read_only_fields = ('userid', 'email', 'image_url')
+    
+    def get_current_vehicle(self, obj):
+        """Retorna toda la información del vehículo"""
+        if obj.current_vehicle:
+            from vehicles.serializers import VehicleSerializer
+            return VehicleSerializer(obj.current_vehicle).data
+        return None
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

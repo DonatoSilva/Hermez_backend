@@ -148,6 +148,7 @@ class Delivery(models.Model):
         ('picked_up', 'Recogido'),
         ('in_transit', 'En tránsito'),
         ('delivered', 'Entregado'),
+        ('paid', 'Pagado'),
         ('cancelled', 'Cancelado'),
     ]
     

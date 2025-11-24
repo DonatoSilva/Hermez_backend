@@ -49,6 +49,7 @@ def clerk_webhook(request):
             defaults = {
                 "first_name": data.get("first_name", ""),
                 "last_name": data.get("last_name", ""),
+                "username": data.get("username", ""),
                 "image_url": data.get("image_url", ""),
                 "email": email,
             }

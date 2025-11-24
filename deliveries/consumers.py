@@ -1,8 +1,8 @@
 from channels.generic.websocket import JsonWebsocketConsumer
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser
-from .models import DeliveryQuote
-from .serializers import DeliveryQuoteSerializer
+from .models import DeliveryQuote, DeliveryOffer
+from .serializers import DeliveryQuoteSerializer, DeliveryOfferSerializer
 
 # Authentication helpers: try to support DRF Token and SimpleJWT if available
 try:
@@ -134,6 +134,7 @@ class DeliveryConsumer(JsonWebsocketConsumer):
         self.group_type = self.scope.get('url_route', {}).get('kwargs', {}).get('group_type')
         quote_id = self.scope.get('url_route', {}).get('kwargs', {}).get('quote_id')
         delivery_id = self.scope.get('url_route', {}).get('kwargs', {}).get('delivery_id')
+        person_id = self.scope.get('url_route', {}).get('kwargs', {}).get('person_id')
 
         if self.group_type == 'quote' and quote_id:
             self.group_name = f"quote_{quote_id}"
@@ -141,6 +142,9 @@ class DeliveryConsumer(JsonWebsocketConsumer):
             self.group_name = f"delivery_{delivery_id}"
         elif self.group_type == 'new_quotes':
             self.group_name = "new_quotes"
+        elif self.group_type == 'person_stats' and person_id:
+            self.group_name = f"person_stats_{person_id}"
+            self.person_id = person_id
         else:
             self.close()
             return
@@ -167,46 +171,135 @@ class DeliveryConsumer(JsonWebsocketConsumer):
                 self.accept()
 
         # Enviar quotes existentes (por ejemplo, status pending) al cliente que conecta
-        try:
-            qs = DeliveryQuote.objects.filter(status="pending")
-            initial = DeliveryQuoteSerializer(qs, many=True).data
-            # Asegurar que los tipos no serializables por JSON (Decimal, UUID) se conviertan a str
-            import json
-            safe_initial = json.loads(json.dumps(initial, default=str))
+        if self.group_type == 'new_quotes':
+            # Domiciliarios viendo lista de quotes - NO mostrar offers de otros domiciliarios
             try:
-                self.send_json({"type": "initial_quotes", "quotes": safe_initial})
-            except Exception:
-                # Evitar que una desconexión del cliente (ClientDisconnected)
-                # genere una excepción no manejada aquí. Importar localmente
-                # para no introducir dependencia si channels cambia.
+                qs = DeliveryQuote.objects.filter(status="pending")
+                initial_quotes = DeliveryQuoteSerializer(qs, many=True).data
+                
+                # NO agregar offers aquí - vulnerabilidad de seguridad
+                
+                # Asegurar que los tipos no serializables por JSON (Decimal, UUID) se conviertan a str
+                import json
+                safe_initial = json.loads(json.dumps(initial_quotes, default=str))
                 try:
-                    from channels.exceptions import ClientDisconnected
+                    self.send_json({"type": "initial_quotes", "quotes": safe_initial})
                 except Exception:
-                    ClientDisconnected = None
-
-                if ClientDisconnected is not None:
+                    # Evitar que una desconexión del cliente (ClientDisconnected)
+                    # genere una excepción no manejada aquí. Importar localmente
+                    # para no introducir dependencia si channels cambia.
                     try:
-                        # Reintentar captura específica
-                        self.send_json({"type": "initial_quotes", "quotes": safe_initial})
-                    except Exception as exc_inner:
-                        # Si el cliente ya se desconectó, ignorar silenciosamente
-                        if isinstance(exc_inner, ClientDisconnected):
-                            return
+                        from channels.exceptions import ClientDisconnected
+                    except Exception:
+                        ClientDisconnected = None
+
+                    if ClientDisconnected is not None:
+                        try:
+                            # Reintentar captura específica
+                            self.send_json({"type": "initial_quotes", "quotes": safe_initial})
+                        except Exception as exc_inner:
+                            # Si el cliente ya se desconectó, ignorar silenciosamente
+                            if isinstance(exc_inner, ClientDisconnected):
+                                return
+                            try:
+                                pass
+                            except Exception:
+                                pass
+                    else:
+                        # Si no podemos identificar ClientDisconnected, loguear el error
                         try:
                             pass
                         except Exception:
                             pass
-                else:
-                    # Si no podemos identificar ClientDisconnected, loguear el error
-                    try:
-                        pass
-                    except Exception:
-                        pass
-        except Exception as e:
+            except Exception as e:
+                try:
+                    pass
+                except Exception:
+                    pass
+        
+        elif self.group_type == 'quote':
+            # Cliente viendo su cotización específica - SÍ mostrar todas las offers
             try:
-                pass
-            except Exception:
-                pass
+                # Obtener solo el quote específico que está viendo
+                qs = DeliveryQuote.objects.filter(id=quote_id, status="pending")
+                initial_quotes = DeliveryQuoteSerializer(qs, many=True).data
+                
+                # Para este quote específico, agregar sus offers (el cliente debe verlas todas)
+                for quote_data in initial_quotes:
+                    quote_id_data = quote_data.get('id')
+                    if quote_id_data:
+                        offers = DeliveryOffer.objects.filter(quote_id=quote_id_data, status='pending')
+                        quote_data['offers'] = DeliveryOfferSerializer(offers, many=True, context={'request': self.scope}).data
+                
+                # Asegurar que los tipos no serializables por JSON (Decimal, UUID) se conviertan a str
+                import json
+                safe_initial = json.loads(json.dumps(initial_quotes, default=str))
+                try:
+                    self.send_json({"type": "initial_quotes", "quotes": safe_initial})
+                except Exception:
+                    try:
+                        from channels.exceptions import ClientDisconnected
+                    except Exception:
+                        ClientDisconnected = None
+
+                    if ClientDisconnected is not None:
+                        try:
+                            self.send_json({"type": "initial_quotes", "quotes": safe_initial})
+                        except Exception as exc_inner:
+                            if isinstance(exc_inner, ClientDisconnected):
+                                return
+                            try:
+                                pass
+                            except Exception:
+                                pass
+                    else:
+                        try:
+                            pass
+                        except Exception:
+                            pass
+            except Exception as e:
+                try:
+                    pass
+                except Exception:
+                    pass
+        
+        # Enviar estadísticas de domicilios completados para person_stats
+        elif self.group_type == 'person_stats':
+            try:
+                from .models import Delivery
+                from .serializers import DeliverySerializer
+                from decimal import Decimal
+                
+                # Obtener domicilios completados (delivered o paid)
+                deliveries = Delivery.objects.filter(
+                    delivery_person_id=self.person_id,
+                    status__in=['delivered', 'paid']
+                )
+                
+                # Serializar los domicilios
+                deliveries_data = DeliverySerializer(deliveries, many=True).data
+                
+                # Calcular el total
+                total = sum(Decimal(str(d.final_price)) for d in deliveries)
+                
+                # Preparar respuesta
+                import json
+                response_data = {
+                    'type': 'person_stats',
+                    'deliveries': deliveries_data,
+                    'total': str(total),
+                    'count': deliveries.count()
+                }
+                
+                # Convertir a tipos seguros para serialización
+                safe_data = json.loads(json.dumps(response_data, default=str))
+                
+                self.send_json(safe_data)
+            except Exception as e:
+                try:
+                    pass
+                except Exception:
+                    pass
 
     def disconnect(self, close_code):
         if hasattr(self, 'group_name'):

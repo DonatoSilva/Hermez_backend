@@ -130,7 +130,7 @@ class DeliveryOfferSerializer(serializers.ModelSerializer):
     """Serializer para ofertas de domiciliarios"""
     delivery_person = UserSerializer(read_only=True)
     quote = DeliveryQuoteSerializer(read_only=True)
-    vehicle = serializers.StringRelatedField(read_only=True)
+    vehicle = serializers.SerializerMethodField(read_only=True)
     can_accept = serializers.SerializerMethodField(read_only=True)
     
     # Campos para escritura
@@ -160,6 +160,33 @@ class DeliveryOfferSerializer(serializers.ModelSerializer):
             'delivery_person_id', 'quote_id', 'vehicle_id', 'can_accept'
         ]
         read_only_fields = ['status', 'created_at', 'updated_at', 'expires_at', 'can_accept']
+
+    def get_vehicle(self, obj):
+        """Retorna toda la información del vehículo"""
+        if obj.vehicle:
+            from vehicles.serializers import VehicleSerializer
+            return VehicleSerializer(obj.vehicle).data
+        return None
+
+    def create(self, validated_data):
+        """Guardar automáticamente el current_vehicle del delivery_person si no se especifica"""
+        delivery_person = validated_data.get('delivery_person')
+        
+        # Si no se especificó un vehículo, usar el current_vehicle del delivery_person
+        if not validated_data.get('vehicle') and delivery_person and delivery_person.current_vehicle:
+            validated_data['vehicle'] = delivery_person.current_vehicle
+        
+        return super().create(validated_data)
+    
+    def update(self, instance, validated_data):
+        """Actualizar y usar current_vehicle si no se especifica"""
+        delivery_person = validated_data.get('delivery_person', instance.delivery_person)
+        
+        # Si no se especificó un vehículo en la actualización, usar el current_vehicle
+        if 'vehicle' not in validated_data and delivery_person and delivery_person.current_vehicle:
+            validated_data['vehicle'] = delivery_person.current_vehicle
+        
+        return super().update(instance, validated_data)
 
     def validate(self, data):
         """Validación personalizada para la oferta"""
