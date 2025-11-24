@@ -69,6 +69,14 @@ class User(models.Model):
     def __str__(self):
         return f"User {self.userid}"
 
+    def toggle_availability(self):
+        """
+        Invierte el estado de `is_available`, guarda el cambio y devuelve el nuevo valor (bool).
+        """
+        self.is_available = not self.is_available
+        self.save(update_fields=['is_available'])
+        return self.is_available
+
 class UserRating(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ratee = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_ratings', editable=False)

@@ -66,8 +66,6 @@ class ClerkAuthentication(BaseAuthentication):
             try:
                 user = User.objects.get(userid=user_id)
                 
-                print("Usuario encontrado en la base de datos:", user)
-                
                 # Fallback: Actualizar si los datos del token son más recientes/diferentes
                 # Esto es útil si el webhook falló o aún no ha llegado
                 needs_save = False

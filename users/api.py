@@ -4,6 +4,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .serializers import UserSerializer, UserRatingSerializer
 from users.authentication import ClerkAuthentication
+from vehicles.models import Vehicle
 
 class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
@@ -46,6 +47,12 @@ class UserViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Access denied'}, status=status.HTTP_403_FORBIDDEN)
         return super().destroy(request, *args, **kwargs)
 
+    @action(detail=False, methods=['post'], url_path='toggle-availability')
+    def toggle_availability(self, request):
+        user = request.user
+        new_state = user.toggle_availability()
+        return Response({'is_available': new_state}, status=status.HTTP_200_OK)
+
         
     @action(detail=True, methods=['get'], url_path='ratings')
     def ratings(self, request, pk=None):
@@ -56,6 +63,42 @@ class UserViewSet(viewsets.ModelViewSet):
         ratings = user.received_ratings.all()
         serializer = self.get_serializer(ratings, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['post'], url_path='set-current-vehicle')
+    def set_current_vehicle(self, request):
+        """
+        POST /api/me/set-current-vehicle/ -> establece `current_vehicle` del usuario autenticado.
+        Payload: { "vehicle_id": "<uuid>" }
+        Validaciones:
+        - `vehicle_id` no puede venir vacío
+        - el vehículo debe pertenecer al usuario autenticado
+        """
+        user = request.user
+        vehicle_id = request.data.get('vehicle_id') or request.data.get('vehicleId')
+
+        if not vehicle_id:
+            return Response({'vehicle_id': 'Este campo es requerido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            vehicle = Vehicle.objects.get(vehicleId=vehicle_id)
+        except Vehicle.DoesNotExist:
+            return Response({'vehicle_id': 'Vehículo no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Verificar pertenencia: el vehículo debe pertenecer al usuario autenticado
+        if vehicle.userId_id != getattr(user, 'userid', None):
+            return Response({'detail': 'El vehículo no pertenece al usuario autenticado.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Si el vehículo enviado es el mismo que el actual, deseleccionarlo (poner a null)
+        if getattr(user, 'current_vehicle_id', None) == vehicle.vehicleId:
+            user.current_vehicle = None
+            user.save(update_fields=['current_vehicle'])
+            return Response({'message': 'Vehículo deseleccionado correctamente', 'vehicle_id': None}, status=status.HTTP_200_OK)
+
+        # Asignar y guardar
+        user.current_vehicle = vehicle
+        user.save(update_fields=['current_vehicle'])
+
+        return Response({'message': 'Vehículo actual establecido correctamente', 'vehicle_id': str(vehicle.vehicleId)}, status=status.HTTP_200_OK)
 
 class UserRatingViewSet(viewsets.ModelViewSet):
     queryset = UserRating.objects.all()
