@@ -30,6 +30,7 @@ class User(models.Model):
     first_name = models.CharField(max_length=150, blank=True, null=True)
     last_name = models.CharField(max_length=150, blank=True, null=True)
     email = models.EmailField(blank=True, null=True)
+    username = models.CharField(max_length=150, blank=True, null=True, unique=True)
     image_url = models.URLField(max_length=500, blank=True, null=True)
 
     # Campo de contraseña requerido por Django, pero no usado por Clerk
