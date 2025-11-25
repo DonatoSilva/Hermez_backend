@@ -10,7 +10,18 @@ def _broadcast(group_name, payload):
     channel_layer = get_channel_layer()
     if not channel_layer or not group_name:
         return
-    async_to_sync(channel_layer.group_send)(group_name, {'type': 'broadcast', 'data': payload})
+
+
+    import json
+    try:
+        safe_payload = json.loads(json.dumps(payload, default=str))
+    except Exception:
+        try:
+            safe_payload = srtr(payload)
+        except Exception:
+            safe_payload = {}
+
+    async_to_sync(channel_layer.group_send)(group_name, {'type': 'broadcast', 'data': safe_payload})
 
 
 def expire_quotes_and_offers():
