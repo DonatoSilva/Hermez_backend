@@ -25,14 +25,16 @@ def _collect_expired_quotes():
 
     payloads = []
     for quote in queryset:
-        payloads.append((quote.id, DeliveryQuoteSerializer(quote).data))
+        payloads.append((quote.id, quote.client_id, DeliveryQuoteSerializer(quote).data))
 
     count = queryset.count()
     if count:
         queryset.delete()
-        for quote_id, payload in payloads:
-            _broadcast('new_quotes', {'type': 'quote_expired', 'data': payload})
-            _broadcast(f'quote_{quote_id}', {'type': 'quote_expired', 'data': payload})
+        for quote_id, client_id, payload in payloads:
+            event = {'type': 'quote_expired', 'data': payload}
+            _broadcast('new_quotes', event)
+            _broadcast(f'quote_{quote_id}', event)
+            _broadcast(f'user_quotes_{client_id}', event)
     return count
 
 
@@ -42,11 +44,13 @@ def _collect_expired_offers():
 
     payloads = []
     for offer in queryset.select_related('quote'):
-        payloads.append((offer.quote_id, DeliveryOfferSerializer(offer).data))
+        payloads.append((offer.quote_id, offer.quote.client_id, DeliveryOfferSerializer(offer).data))
 
     count = queryset.count()
     if count:
         queryset.delete()
-        for quote_id, payload in payloads:
-            _broadcast(f'quote_{quote_id}', {'type': 'offer_expired', 'data': payload})
+        for quote_id, client_id, payload in payloads:
+            event = {'type': 'offer_expired', 'data': payload}
+            _broadcast(f'quote_{quote_id}', event)
+            _broadcast(f'user_quotes_{client_id}', event)
     return count

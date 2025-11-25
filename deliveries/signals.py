@@ -22,6 +22,10 @@ def on_quote_created(sender, instance, created, **kwargs):
             f'quote_{instance.id}',
             {'type': 'broadcast', 'data': {'type': 'quote_created', 'data': safe_data}}
         )
+        async_to_sync(channel_layer.group_send)(
+            f'user_quotes_{instance.client_id}',
+            {'type': 'broadcast', 'data': {'type': 'quote_created', 'data': safe_data}}
+        )
 
 @receiver(post_save, sender=DeliveryOffer)
 def on_offer_saved(sender, instance, created, **kwargs):
@@ -38,6 +42,15 @@ def on_offer_saved(sender, instance, created, **kwargs):
             f'quote_{instance.quote.id}',
             {'type': 'broadcast', 'data': {'type': 'offer.accepted', 'data': safe_data}}
         )
+    async_to_sync(channel_layer.group_send)(
+        f'user_quotes_{instance.quote.client_id}',
+        {'type': 'broadcast', 'data': {'type': event_type, 'data': safe_data}}
+    )
+    if instance.status == 'accepted':
+        async_to_sync(channel_layer.group_send)(
+            f'user_quotes_{instance.quote.client_id}',
+            {'type': 'broadcast', 'data': {'type': 'offer.accepted', 'data': safe_data}}
+        )
 
 @receiver(post_save, sender=Delivery)
 def on_delivery_saved(sender, instance, created, **kwargs):
@@ -47,5 +60,9 @@ def on_delivery_saved(sender, instance, created, **kwargs):
     event_type = 'delivery.created' if created else 'delivery.status'
     async_to_sync(channel_layer.group_send)(
         f'delivery_{instance.id}',
+        {'type': 'broadcast', 'data': {'type': event_type, 'data': safe_data}}
+    )
+    async_to_sync(channel_layer.group_send)(
+        f'user_deliveries_{instance.client_id}',
         {'type': 'broadcast', 'data': {'type': event_type, 'data': safe_data}}
     )

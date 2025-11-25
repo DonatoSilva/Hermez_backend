@@ -1,3 +1,5 @@
+channels
+
 annotated-types==0.7.0
 anyio==4.11.0
 asgiref==3.9.1

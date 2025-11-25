@@ -1,5 +1,5 @@
 Param(
-    [string]$ProjectPath = "C:\DNserver\Hermez_backend",
+    [string]$ProjectPath = "C:\Trabajo-local\Domicilio Donatello (Navidad)\Hermez_backend",
     [int]$IntervalSeconds = 60,
     [string]$PythonExe = "python"
 )

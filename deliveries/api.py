@@ -115,6 +115,12 @@ class DeliveryOfferViewSet(viewsets.ModelViewSet):
             description=f'Domicilio creado a partir de oferta aceptada',
             changed_by=request.user
         )
+
+        quote_payload = DeliveryQuoteSerializer(offer.quote, context={'request': request}).data
+        delivery_payload = DeliverySerializer(delivery, context={'request': request}).data
+        _broadcast(f'quote_{str(offer.quote.id)}', {'type': 'quote_updated', 'data': quote_payload})
+        _broadcast(f'user_quotes_{offer.quote.client_id}', {'type': 'quote_updated', 'data': quote_payload})
+        _broadcast(f'user_deliveries_{delivery.client_id}', {'type': 'delivery_created', 'data': delivery_payload})
         
         # Eliminar objetos temporales (opcional - se puede hacer después)
         # offer.delete()
@@ -144,7 +150,11 @@ class DeliveryOfferViewSet(viewsets.ModelViewSet):
             description=f'Oferta rechazada por el cliente',
             changed_by=request.user
         )
-        
+
+        offer_payload = DeliveryOfferSerializer(offer, context={'request': request}).data
+        _broadcast(f'quote_{str(offer.quote.id)}', {'type': 'offer_rejected', 'data': offer_payload})
+        _broadcast(f'user_quotes_{offer.quote.client_id}', {'type': 'offer_rejected', 'data': offer_payload})
+
         return Response({'status': 'Oferta rechazada'})
 
     @action(detail=True, methods=['post'], url_path='extend-expiration')
@@ -173,6 +183,16 @@ class DeliveryQuoteViewSet(viewsets.ModelViewSet):
     queryset = DeliveryQuote.objects.all()
     serializer_class = DeliveryQuoteSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """Limit access so users only see their own quotes unless staff."""
+        qs = super().get_queryset()
+        user = getattr(self.request, 'user', None)
+
+        if user is None or not user.is_authenticated:
+            return qs.none()
+
+        return qs
 
     @action(detail=True, methods=['get','post'], url_path='offers')
     def offers(self, request, pk=None):
@@ -248,6 +268,7 @@ class DeliveryQuoteViewSet(viewsets.ModelViewSet):
         # emitir broadcast para que clientes conectados actualicen UI
         _broadcast('new_quotes', {'type': 'quote_expired', 'data': serialized})
         _broadcast(f'quote_{str(quote.id)}', {'type': 'quote_expired', 'data': serialized})
+        _broadcast(f'user_quotes_{quote.client_id}', {'type': 'quote_expired', 'data': serialized})
 
         return Response(serialized, status=status.HTTP_200_OK)
 

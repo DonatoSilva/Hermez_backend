@@ -249,4 +249,15 @@ Delivery (1) ──────< (N) DeliveryHistory
 
 ---
 
+## 🔌 Canales WebSocket Relevantes
+
+- `ws/deliveries/users/<userid>/quotes/`: entrega en tiempo real todas las cotizaciones del usuario autenticado, incluyendo ofertas asociadas. La conexión solo se acepta si el token pertenece al mismo `userid`.
+- `ws/deliveries/users/<userid>/deliveries/`: transmite los domicilios del cliente en curso (`assigned`, `picked_up`, `in_transit`). Ideal para dashboards de seguimiento.
+- Tokens inválidos o `userid` distintos provocan cierre inmediato para evitar accesos cruzados.
+- Los canales existentes (`quote_<id>`, `delivery_<id>`, `new_quotes`, `person_stats_<id>`) continúan funcionando y también reciben los eventos emitidos por señales y tareas de expiración.
+
+Cada conexión debe incluir el token de autenticación en el subprotocolo (`Bearer <token>`). Al establecer el WebSocket se envía un payload inicial (`user_quotes.initial` o `user_deliveries.initial`) seguido de eventos `broadcast` con cambios posteriores.
+
+---
+
 _Generado para diagrama entidad-relación del proyecto Hermez Backend_

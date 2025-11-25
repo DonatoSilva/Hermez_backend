@@ -1,8 +1,9 @@
 from channels.generic.websocket import JsonWebsocketConsumer
 from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser
-from .models import DeliveryQuote, DeliveryOffer
-from .serializers import DeliveryQuoteSerializer, DeliveryOfferSerializer
+from .models import DeliveryQuote, DeliveryOffer, Delivery
+from .serializers import DeliveryQuoteSerializer, DeliveryOfferSerializer, DeliverySerializer
+import json
 
 # Authentication helpers: try to support DRF Token and SimpleJWT if available
 try:
@@ -14,6 +15,9 @@ try:
     from rest_framework_simplejwt.authentication import JWTAuthentication
 except Exception:
     JWTAuthentication = None
+
+IN_PROGRESS_STATUSES = {'assigned', 'picked_up', 'in_transit'}
+
 
 class DeliveryConsumer(JsonWebsocketConsumer):
     def connect(self):
@@ -135,6 +139,9 @@ class DeliveryConsumer(JsonWebsocketConsumer):
         quote_id = self.scope.get('url_route', {}).get('kwargs', {}).get('quote_id')
         delivery_id = self.scope.get('url_route', {}).get('kwargs', {}).get('delivery_id')
         person_id = self.scope.get('url_route', {}).get('kwargs', {}).get('person_id')
+        user_id = self.scope.get('url_route', {}).get('kwargs', {}).get('user_id')
+        auth_user = self.scope.get('user')
+        auth_user_id = getattr(auth_user, 'pk', None) or getattr(auth_user, 'userid', None)
 
         if self.group_type == 'quote' and quote_id:
             self.group_name = f"quote_{quote_id}"
@@ -145,6 +152,18 @@ class DeliveryConsumer(JsonWebsocketConsumer):
         elif self.group_type == 'person_stats' and person_id:
             self.group_name = f"person_stats_{person_id}"
             self.person_id = person_id
+        elif self.group_type == 'user_quotes' and user_id:
+            if not self._owns_resource(auth_user_id, user_id):
+                self.close()
+                return
+            self.user_id = str(user_id)
+            self.group_name = f"user_quotes_{self.user_id}"
+        elif self.group_type == 'user_deliveries' and user_id:
+            if not self._owns_resource(auth_user_id, user_id):
+                self.close()
+                return
+            self.user_id = str(user_id)
+            self.group_name = f"user_deliveries_{self.user_id}"
         else:
             self.close()
             return
@@ -180,7 +199,6 @@ class DeliveryConsumer(JsonWebsocketConsumer):
                 # NO agregar offers aquí - vulnerabilidad de seguridad
                 
                 # Asegurar que los tipos no serializables por JSON (Decimal, UUID) se conviertan a str
-                import json
                 safe_initial = json.loads(json.dumps(initial_quotes, default=str))
                 try:
                     self.send_json({"type": "initial_quotes", "quotes": safe_initial})
@@ -232,7 +250,6 @@ class DeliveryConsumer(JsonWebsocketConsumer):
                         quote_data['offers'] = DeliveryOfferSerializer(offers, many=True, context={'request': self.scope}).data
                 
                 # Asegurar que los tipos no serializables por JSON (Decimal, UUID) se conviertan a str
-                import json
                 safe_initial = json.loads(json.dumps(initial_quotes, default=str))
                 try:
                     self.send_json({"type": "initial_quotes", "quotes": safe_initial})
@@ -283,7 +300,6 @@ class DeliveryConsumer(JsonWebsocketConsumer):
                 total = sum(Decimal(str(d.final_price)) for d in deliveries)
                 
                 # Preparar respuesta
-                import json
                 response_data = {
                     'type': 'person_stats',
                     'deliveries': deliveries_data,
@@ -300,6 +316,33 @@ class DeliveryConsumer(JsonWebsocketConsumer):
                     pass
                 except Exception:
                     pass
+        elif self.group_type == 'user_quotes':
+            try:
+                qs = DeliveryQuote.objects.filter(client_id=self.user_id).order_by('-created_at')
+                initial_quotes = DeliveryQuoteSerializer(qs, many=True).data
+                for quote_data in initial_quotes:
+                    quote_id_data = quote_data.get('id')
+                    if quote_id_data:
+                        offers = DeliveryOffer.objects.filter(quote_id=quote_id_data)
+                        quote_data['offers'] = DeliveryOfferSerializer(offers, many=True).data
+                safe_initial = json.loads(json.dumps(initial_quotes, default=str))
+                self.send_json({"type": "user_quotes.initial", "quotes": safe_initial})
+            except Exception:
+                try:
+                    pass
+                except Exception:
+                    pass
+        elif self.group_type == 'user_deliveries':
+            try:
+                deliveries = Delivery.objects.filter(client_id=self.user_id, status__in=IN_PROGRESS_STATUSES)
+                deliveries_data = DeliverySerializer(deliveries, many=True).data
+                safe_initial = json.loads(json.dumps(deliveries_data, default=str))
+                self.send_json({"type": "user_deliveries.initial", "deliveries": safe_initial})
+            except Exception:
+                try:
+                    pass
+                except Exception:
+                    pass
 
     def disconnect(self, close_code):
         if hasattr(self, 'group_name'):
@@ -311,3 +354,8 @@ class DeliveryConsumer(JsonWebsocketConsumer):
     def broadcast(self, event):
         data = event.get('data', {})
         self.send_json(data)
+
+    def _owns_resource(self, auth_user_id, requested_id):
+        if not auth_user_id or not requested_id:
+            return False
+        return str(auth_user_id) == str(requested_id)
