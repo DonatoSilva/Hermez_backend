@@ -4,6 +4,9 @@ from rest_framework.response import Response
 from .models import DeliveryQuote, DeliveryOffer, DeliveryCategory, Delivery, DeliveryHistory
 from deliveries.services.expiration import _broadcast
 from .serializers import DeliveryQuoteSerializer, DeliveryOfferSerializer, DeliveryCategorySerializer, DeliverySerializer, DeliveryHistorySerializer
+from django.db.models import Q
+from django.utils import timezone
+import datetime
 
 class DeliveryCategoryViewSet(viewsets.ModelViewSet):
     queryset = DeliveryCategory.objects.all()
@@ -11,9 +14,69 @@ class DeliveryCategoryViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
 class DeliveryViewSet(viewsets.ModelViewSet):
-    queryset = Delivery.objects.all()
     serializer_class = DeliverySerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Por defecto devuelve los domicilios donde `client` es el usuario autenticado.
+        Si se pasa `?filter_by=delivery_person` devuelve los domicilios asignados al usuario
+        (campo `delivery_person`). Si se pasa `?filter_by=all` y el usuario es staff,
+        devuelve todos los domicilios.
+        """
+        user = getattr(self.request, 'user', None)
+
+        if user is None or not user.is_authenticated:
+            return Delivery.objects.none()
+
+        # Si se solicita un detalle (pk en kwargs) permitir acceso si el usuario es
+        # client o delivery_person del registro (evita 404 cuando un domiciliario
+        # accede al recurso sin pasar ?filter_by)
+        pk = self.kwargs.get('pk')
+        filter_by = self.request.query_params.get('filter_by', None)
+
+        if pk:
+            # permitir si es cliente o domiciliario o staff
+            if user.is_staff:
+                return Delivery.objects.all()
+            return Delivery.objects.filter(Q(client=user) | Q(delivery_person=user))
+
+        # Sin pk: comportamiento por lista
+        qs = None
+
+        if filter_by == 'delivery_person':
+            qs = Delivery.objects.filter(delivery_person=user)
+        elif filter_by == 'all' and user.is_staff:
+            qs = Delivery.objects.all()
+        else:
+            # default: client
+            qs = Delivery.objects.filter(client=user)
+
+        # Filtrar por estado si se recibe ?status=
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        # Filtrar por mes (query param `month` 1-12). Si se pasa `year` lo usa,
+        # sino asume el año actual.
+        month = self.request.query_params.get('month')
+        if month:
+            try:
+                month_i = int(month)
+                if 1 <= month_i <= 12:
+                    year = self.request.query_params.get('year')
+                    if year:
+                        year_i = int(year)
+                    else:
+                        year_i = timezone.now().year
+
+                    # Usar lookups de mes/año para evitar problemas de zonas horarias
+                    qs = qs.filter(created_at__month=month_i, created_at__year=year_i)
+            except (TypeError, ValueError):
+                # si month no es válido, ignorar el filtro
+                pass
+
+        return qs
 
     @action(detail=True, methods=['get'])
     def history(self, request, pk=None):
