@@ -66,3 +66,13 @@ def on_delivery_saved(sender, instance, created, **kwargs):
         f'user_deliveries_{instance.client_id}',
         {'type': 'broadcast', 'data': {'type': event_type, 'data': safe_data}}
     )
+    # También notificar al domiciliario asignado (si existe) para que reciba actualizaciones
+    try:
+        delivery_person_id = getattr(instance, 'delivery_person_id', None)
+        if delivery_person_id:
+            async_to_sync(channel_layer.group_send)(
+                f'driver_deliveries_{delivery_person_id}',
+                {'type': 'broadcast', 'data': {'type': event_type, 'data': safe_data}}
+            )
+    except Exception:
+        pass

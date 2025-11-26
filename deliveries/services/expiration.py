@@ -17,7 +17,7 @@ def _broadcast(group_name, payload):
         safe_payload = json.loads(json.dumps(payload, default=str))
     except Exception:
         try:
-            safe_payload = srtr(payload)
+            safe_payload = str(payload)
         except Exception:
             safe_payload = {}
 
@@ -32,7 +32,7 @@ def expire_quotes_and_offers():
 
 def _collect_expired_quotes():
     now = timezone.now()
-    queryset = DeliveryQuote.objects.filter(status='pending', expires_at__isnull=False, expires_at__lte=now)
+    queryset = DeliveryQuote.objects.filter(status__in=['pending', 'cancelled'], expires_at__isnull=False, expires_at__lte=now)
 
     payloads = []
     for quote in queryset:

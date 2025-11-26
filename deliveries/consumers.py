@@ -152,18 +152,46 @@ class DeliveryConsumer(JsonWebsocketConsumer):
         elif self.group_type == 'person_stats' and person_id:
             self.group_name = f"person_stats_{person_id}"
             self.person_id = person_id
-        elif self.group_type == 'user_quotes' and user_id:
-            if not self._owns_resource(auth_user_id, user_id):
-                self.close()
-                return
-            self.user_id = str(user_id)
+        elif self.group_type == 'user_quotes':
+            # Permitir que la ruta use 'me' para referirse al usuario autenticado
+            if user_id == 'me':
+                if not auth_user_id:
+                    self.close()
+                    return
+                self.user_id = str(auth_user_id)
+            else:
+                if not self._owns_resource(auth_user_id, user_id):
+                    self.close()
+                    return
+                self.user_id = str(user_id)
             self.group_name = f"user_quotes_{self.user_id}"
-        elif self.group_type == 'user_deliveries' and user_id:
-            if not self._owns_resource(auth_user_id, user_id):
-                self.close()
-                return
-            self.user_id = str(user_id)
+
+        elif self.group_type == 'user_deliveries':
+            # Igual comportamiento: 'me' refiere al usuario autenticado
+            if user_id == 'me':
+                if not auth_user_id:
+                    self.close()
+                    return
+                self.user_id = str(auth_user_id)
+            else:
+                if not self._owns_resource(auth_user_id, user_id):
+                    self.close()
+                    return
+                self.user_id = str(user_id)
             self.group_name = f"user_deliveries_{self.user_id}"
+        elif self.group_type == 'driver_deliveries':
+            # Domiciliarios recibiendo sus entregas asignadas
+            if user_id == 'me':
+                if not auth_user_id:
+                    self.close()
+                    return
+                self.user_id = str(auth_user_id)
+            else:
+                if not self._owns_resource(auth_user_id, user_id):
+                    self.close()
+                    return
+                self.user_id = str(user_id)
+            self.group_name = f"driver_deliveries_{self.user_id}"
         else:
             self.close()
             return
@@ -283,8 +311,6 @@ class DeliveryConsumer(JsonWebsocketConsumer):
         # Enviar estadísticas de domicilios completados para person_stats
         elif self.group_type == 'person_stats':
             try:
-                from .models import Delivery
-                from .serializers import DeliverySerializer
                 from decimal import Decimal
                 
                 # Obtener domicilios completados (delivered o paid)
@@ -335,14 +361,31 @@ class DeliveryConsumer(JsonWebsocketConsumer):
         elif self.group_type == 'user_deliveries':
             try:
                 deliveries = Delivery.objects.filter(client_id=self.user_id, status__in=IN_PROGRESS_STATUSES)
+                print(f"[user_deliveries] Buscando domicilios para client_id={self.user_id}")
+                print(f"[user_deliveries] Encontrados {deliveries.count()} domicilios en proceso")
                 deliveries_data = DeliverySerializer(deliveries, many=True).data
                 safe_initial = json.loads(json.dumps(deliveries_data, default=str))
+                print(f"[user_deliveries] Enviando {len(safe_initial)} domicilios al cliente")
                 self.send_json({"type": "user_deliveries.initial", "deliveries": safe_initial})
-            except Exception:
-                try:
-                    pass
-                except Exception:
-                    pass
+            except Exception as e:
+                print(f"[user_deliveries] ERROR: {e}")
+                import traceback
+                traceback.print_exc()
+
+        elif self.group_type == 'driver_deliveries':
+            # Entregas asignadas al domiciliario (delivery_person_id)
+            try:
+                deliveries = Delivery.objects.filter(delivery_person_id=self.user_id, status__in=IN_PROGRESS_STATUSES)
+                print(f"[driver_deliveries] Buscando domicilios para delivery_person_id={self.user_id}")
+                print(f"[driver_deliveries] Encontrados {deliveries.count()} domicilios en proceso")
+                deliveries_data = DeliverySerializer(deliveries, many=True).data
+                safe_initial = json.loads(json.dumps(deliveries_data, default=str))
+                print(f"[driver_deliveries] Enviando {len(safe_initial)} domicilios al domiciliario")
+                self.send_json({"type": "driver_deliveries.initial", "deliveries": safe_initial})
+            except Exception as e:
+                print(f"[driver_deliveries] ERROR: {e}")
+                import traceback
+                traceback.print_exc()
 
     def disconnect(self, close_code):
         if hasattr(self, 'group_name'):

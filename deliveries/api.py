@@ -36,30 +36,128 @@ class DeliveryViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'])
     def change_status(self, request, pk=None):
-        """Cambiar el estado de un domicilio y registrar en el historial"""
+        """
+        Avanzar automáticamente al siguiente estado del flujo del domicilio.
+        Flujo: assigned -> picked_up -> in_transit -> delivered -> paid
+        No permite avanzar a 'cancelled' (usar endpoint /cancel/ para eso)
+        """
         delivery = self.get_object()
-        new_status = request.data.get('status')
         
-        if not new_status:
-            return Response({'error': 'Se requiere el nuevo estado'}, status=status.HTTP_400_BAD_REQUEST)
+        # Definir el flujo de estados (sin incluir cancelled)
+        STATUS_FLOW = {
+            'assigned': 'picked_up',
+            'picked_up': 'in_transit',
+            'in_transit': 'delivered',
+            'delivered': 'paid',
+            'paid': None,  # Estado final, no hay siguiente
+        }
         
-        if new_status not in dict(delivery.STATUS_CHOICES):
-            return Response({'error': 'Estado inválido'}, status=status.HTTP_400_BAD_REQUEST)
+        current_status = delivery.status
         
+        # Validar que no esté cancelado
+        if current_status == 'cancelled':
+            return Response({
+                'error': 'No se puede cambiar el estado de un domicilio cancelado'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Obtener el siguiente estado
+        next_status = STATUS_FLOW.get(current_status)
+        
+        if next_status is None:
+            return Response({
+                'error': f'El domicilio ya está en el estado final: {delivery.get_status_display()}',
+                'current_status': current_status
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Actualizar al siguiente estado
         old_status = delivery.status
-        delivery.status = new_status
+        delivery.status = next_status
         delivery.save()
         
         # Registrar en el historial
         DeliveryHistory.objects.create(
             history_id=delivery.history_id,
             event_type='status_changed',
-            description=f'Estado cambiado de {old_status} a {new_status}',
+            description=f'Estado cambiado de {old_status} a {next_status}',
             changed_by=request.user
         )
         
-        return Response({'status': 'Estado actualizado correctamente'}, 
-                        status=status.HTTP_200_OK)
+        # Serializar el domicilio actualizado
+        serialized = DeliverySerializer(delivery, context={'request': request}).data
+        
+        # Emitir broadcasts a los grupos relevantes
+        delivery_id = str(delivery.id)
+        client_id = delivery.client_id
+        delivery_person_id = delivery.delivery_person_id
+        
+        payload = {'type': 'delivery_status_changed', 'data': serialized}
+        
+        # Broadcast a grupos específicos
+        _broadcast(f'delivery_{delivery_id}', payload)
+        
+        if client_id:
+            _broadcast(f'user_deliveries_{client_id}', payload)
+        
+        if delivery_person_id:
+            _broadcast(f'driver_deliveries_{delivery_person_id}', payload)
+        
+        return Response({
+            'message': f'Estado actualizado de {old_status} a {next_status}',
+            'old_status': old_status,
+            'new_status': next_status,
+            'delivery': serialized
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Cancelar un domicilio y notificar a todos los WebSockets relevantes"""
+        delivery = self.get_object()
+        
+        # Validar que el domicilio no esté ya en un estado final
+        if delivery.status in ['delivered', 'paid', 'cancelled']:
+            return Response({
+                'error': f'No se puede cancelar un domicilio en estado "{delivery.get_status_display()}"'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Guardar datos antes de actualizar para los broadcasts
+        delivery_id = str(delivery.id)
+        client_id = delivery.client_id
+        delivery_person_id = delivery.delivery_person_id
+        old_status = delivery.status
+        
+        # Actualizar estado a cancelado
+        delivery.status = 'cancelled'
+        delivery.save()  # Esto también actualizará cancelled_at mediante el método save() del modelo
+        
+        # Registrar en el historial
+        DeliveryHistory.objects.create(
+            history_id=delivery.history_id,
+            event_type='cancelled',
+            description=f'Domicilio cancelado (estado anterior: {old_status})',
+            changed_by=request.user
+        )
+        
+        # Serializar el domicilio actualizado
+        serialized = DeliverySerializer(delivery, context={'request': request}).data
+        
+        # Broadcasts a todos los grupos relevantes
+        payload = {'type': 'delivery_cancelled', 'data': serialized}
+        
+        # 1. Grupo específico del domicilio
+        _broadcast(f'delivery_{delivery_id}', payload)
+        
+        # 2. Grupo del cliente (user_deliveries) - el domicilio desaparece de su lista
+        if client_id:
+            _broadcast(f'user_deliveries_{client_id}', payload)
+        
+        # 3. Grupo del domiciliario (driver_deliveries) - el domicilio desaparece de su lista
+        if delivery_person_id:
+            _broadcast(f'driver_deliveries_{delivery_person_id}', payload)
+        
+        return Response({
+            'message': 'Domicilio cancelado exitosamente',
+            'delivery': serialized
+        }, status=status.HTTP_200_OK)
 
 
 class DeliveryOfferViewSet(viewsets.ModelViewSet):
@@ -116,19 +214,34 @@ class DeliveryOfferViewSet(viewsets.ModelViewSet):
             changed_by=request.user
         )
 
+        # Serializar antes de eliminar
         quote_payload = DeliveryQuoteSerializer(offer.quote, context={'request': request}).data
         delivery_payload = DeliverySerializer(delivery, context={'request': request}).data
-        _broadcast(f'quote_{str(offer.quote.id)}', {'type': 'quote_updated', 'data': quote_payload})
-        _broadcast(f'user_quotes_{offer.quote.client_id}', {'type': 'quote_updated', 'data': quote_payload})
+        
+        # Guardar IDs antes de eliminar
+        quote_id = str(offer.quote.id)
+        client_id = offer.quote.client_id
+        
+        # Broadcasts para notificar que la cotización fue aceptada y se eliminará
+        _broadcast(f'quote_{quote_id}', {'type': 'quote_accepted', 'data': quote_payload})
+        _broadcast(f'user_quotes_{client_id}', {'type': 'quote_accepted', 'data': quote_payload})
+        _broadcast(f'new_quotes', {'type': 'quote_accepted', 'data': quote_payload})
+        
+        # Notificar creación del domicilio
         _broadcast(f'user_deliveries_{delivery.client_id}', {'type': 'delivery_created', 'data': delivery_payload})
         
-        # Eliminar objetos temporales (opcional - se puede hacer después)
-        # offer.delete()
-        # offer.quote.delete()
+        # Notificar al domiciliario asignado
+        if delivery.delivery_person_id:
+            _broadcast(f'driver_deliveries_{delivery.delivery_person_id}', {'type': 'delivery_assigned', 'data': delivery_payload})
+        
+        # Eliminar la cotización y todas sus ofertas (cascade)
+        offer.quote.delete()  # Esto también elimina todas las ofertas relacionadas por cascade
         
         return Response({
             'message': 'Oferta aceptada y domicilio creado',
-            'delivery_id': str(delivery.id)
+            'delivery_id': str(delivery.id),
+            'delivery': delivery_payload,
+            'quote_deleted': True
         }, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'])
@@ -251,9 +364,8 @@ class DeliveryQuoteViewSet(viewsets.ModelViewSet):
         if quote.status != 'pending':
             return Response({'error': 'Solo se pueden cancelar cotizaciones pendientes'}, 
                            status=status.HTTP_400_BAD_REQUEST)
-        
+
         quote.status = 'cancelled'
-        quote.save()
 
         # Registrar en el historial antes de eliminar
         DeliveryHistory.objects.create(
@@ -265,10 +377,18 @@ class DeliveryQuoteViewSet(viewsets.ModelViewSet):
 
         serialized = DeliveryQuoteSerializer(quote, context={'request': request}).data
 
-        # emitir broadcast para que clientes conectados actualicen UI
-        _broadcast('new_quotes', {'type': 'quote_expired', 'data': serialized})
-        _broadcast(f'quote_{str(quote.id)}', {'type': 'quote_expired', 'data': serialized})
-        _broadcast(f'user_quotes_{quote.client_id}', {'type': 'quote_expired', 'data': serialized})
+        # Guardar identificadores antes de eliminar definitivamente el registro
+        quote_id = str(quote.id)
+        client_id = quote.client_id
+
+        # Eliminar la cotización (y sus ofertas relacionadas vía cascade)
+        quote.delete()
+
+        # Emitir broadcast para que clientes conectados actualicen UI
+        payload = {'type': 'quote_expired', 'data': serialized}
+        _broadcast('new_quotes', payload)
+        _broadcast(f'quote_{quote_id}', payload)
+        _broadcast(f'user_quotes_{client_id}', payload)
 
         return Response(serialized, status=status.HTTP_200_OK)
 

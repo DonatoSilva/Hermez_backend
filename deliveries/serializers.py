@@ -62,6 +62,8 @@ class DeliverySerializer(serializers.ModelSerializer):
     delivery_person = UserSerializer(read_only=True)
     category = serializers.StringRelatedField(read_only=True)
     vehicle = serializers.StringRelatedField(read_only=True)
+    # Si `vehicle` es null, ofrecer también el `vehicle_type` que vino en la cotización original
+    vehicle_type = serializers.SerializerMethodField(read_only=True)
     
     # Campos para escritura
     client_id = serializers.PrimaryKeyRelatedField(
@@ -93,6 +95,7 @@ class DeliverySerializer(serializers.ModelSerializer):
             'id', 'client', 'delivery_person', 'pickup_address', 'delivery_address', 'category',
             'description', 'estimated_weight', 'estimated_size', 'final_price', 'vehicle', 'status',
             'created_at', 'updated_at', 'completed_at', 'cancelled_at',
+            'vehicle_type',
             'client_id', 'delivery_person_id', 'category_id', 'vehicle_id'
         ]
         read_only_fields = ['status', 'created_at', 'updated_at', 'completed_at', 'cancelled_at']
@@ -109,6 +112,31 @@ class DeliverySerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Las direcciones de recogida y entrega deben ser diferentes")
         
         return data
+
+    def get_vehicle_type(self, obj):
+        """Retorna la información del VehicleType asociada a la cotización original (a través de history_id).
+        Si el delivery ya tiene `vehicle`, no sobreescribimos y devolvemos None (el cliente puede usar `vehicle`).
+        """
+        try:
+            # Si ya existe un vehicle asignado (instancia), preferir eso y no intentar buscar el vehicle_type
+            if getattr(obj, 'vehicle', None):
+                return None
+
+            # Buscar la cotización original por history_id
+            from .models import DeliveryQuote
+            quote = DeliveryQuote.objects.filter(history_id=obj.history_id).first()
+            if not quote or not getattr(quote, 'vehicle_type', None):
+                return None
+
+            # Importar el serializer de VehicleType localmente para evitar import circulares
+            try:
+                from vehicles.serializers import VehicleTypeSerializer
+                return VehicleTypeSerializer(quote.vehicle_type).data
+            except Exception:
+                # Si no existe serializer, devolver el nombre (string) si es posible
+                return str(quote.vehicle_type)
+        except Exception:
+            return None
 
 
 class DeliveryHistorySerializer(serializers.ModelSerializer):

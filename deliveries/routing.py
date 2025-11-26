@@ -8,4 +8,6 @@ websocket_urlpatterns = [
     path('ws/deliveries/person/<str:person_id>/stats/', DeliveryConsumer.as_asgi(), {'group_type': 'person_stats'}),
     path('ws/deliveries/users/<str:user_id>/quotes/', DeliveryConsumer.as_asgi(), {'group_type': 'user_quotes'}),
     path('ws/deliveries/users/<str:user_id>/deliveries/', DeliveryConsumer.as_asgi(), {'group_type': 'user_deliveries'}),
+    # Ruta para que un domiciliario reciba sus entregas asignadas (solo in-progress)
+    path('ws/deliveries/drivers/<str:user_id>/deliveries/', DeliveryConsumer.as_asgi(), {'group_type': 'driver_deliveries'}),
 ]
