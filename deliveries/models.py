@@ -159,6 +159,7 @@ class Delivery(models.Model):
     delivery_address = models.TextField()
     category = models.ForeignKey(DeliveryCategory, on_delete=models.CASCADE)
     description = models.TextField(blank=True, null=True)
+    observations = models.JSONField(default=list, blank=True)
     estimated_weight = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     estimated_size = models.CharField(max_length=100, blank=True, null=True)
     final_price = models.DecimalField(max_digits=10, decimal_places=2)

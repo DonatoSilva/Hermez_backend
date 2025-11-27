@@ -88,11 +88,14 @@ class DeliverySerializer(serializers.ModelSerializer):
         required=False
     )
 
+    # Campo para leer/escribir observations como lista de strings
+    observations = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+
     class Meta:
         model = Delivery
         fields = [
             'id', 'client', 'delivery_person', 'pickup_address', 'delivery_address', 'category',
-            'description', 'estimated_weight', 'estimated_size', 'final_price', 'status',
+            'description', 'observations', 'estimated_weight', 'estimated_size', 'final_price', 'status',
             'created_at', 'updated_at', 'completed_at', 'cancelled_at',
             'vehicle_type',
             'client_id', 'delivery_person_id', 'category_id', 'vehicle_id'

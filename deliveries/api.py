@@ -246,6 +246,7 @@ class DeliveryOfferViewSet(viewsets.ModelViewSet):
             delivery_address=offer.quote.delivery_address,
             category=offer.quote.category,
             description=offer.quote.description,
+            observations=offer.quote.observations,
             estimated_weight=offer.quote.estimated_weight,
             estimated_size=offer.quote.estimated_size,
             final_price=offer.proposed_price,
