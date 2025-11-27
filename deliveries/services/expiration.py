@@ -25,10 +25,22 @@ def _broadcast(group_name, payload):
 
 
 def expire_quotes_and_offers():
-    """Elimina cotizaciones y ofertas pendientes que hayan superado su fecha de expiración."""
+    """Elimina cotizaciones y ofertas pendientes que hayan superado su fecha de expiración.
+    También limpia quotes aceptadas (ya convertidas en Delivery) para evitar huérfanos."""
     expired_quotes = _collect_expired_quotes()
+    accepted_quotes = _cleanup_accepted_quotes()
     expired_offers = _collect_expired_offers()
-    return expired_quotes, expired_offers
+    return expired_quotes + accepted_quotes, expired_offers
+
+
+def _cleanup_accepted_quotes():
+    """Elimina quotes con status 'accepted' ya que ya generaron un Delivery permanente."""
+    queryset = DeliveryQuote.objects.filter(status='accepted')
+    count = queryset.count()
+    if count:
+        queryset.delete()  # CASCADE eliminará también las ofertas relacionadas
+    return count
+
 
 def _collect_expired_quotes():
     now = timezone.now()

@@ -61,8 +61,7 @@ class DeliverySerializer(serializers.ModelSerializer):
     client = UserSerializer(read_only=True)
     delivery_person = UserSerializer(read_only=True)
     category = serializers.StringRelatedField(read_only=True)
-    vehicle = serializers.StringRelatedField(read_only=True)
-    # Si `vehicle` es null, ofrecer también el `vehicle_type` que vino en la cotización original
+    # Tipo de vehículo: nombre del VehicleType (string) desde delivery_person.current_vehicle o quote original
     vehicle_type = serializers.SerializerMethodField(read_only=True)
     
     # Campos para escritura
@@ -93,7 +92,7 @@ class DeliverySerializer(serializers.ModelSerializer):
         model = Delivery
         fields = [
             'id', 'client', 'delivery_person', 'pickup_address', 'delivery_address', 'category',
-            'description', 'estimated_weight', 'estimated_size', 'final_price', 'vehicle', 'status',
+            'description', 'estimated_weight', 'estimated_size', 'final_price', 'status',
             'created_at', 'updated_at', 'completed_at', 'cancelled_at',
             'vehicle_type',
             'client_id', 'delivery_person_id', 'category_id', 'vehicle_id'
@@ -114,27 +113,31 @@ class DeliverySerializer(serializers.ModelSerializer):
         return data
 
     def get_vehicle_type(self, obj):
-        """Retorna la información del VehicleType asociada a la cotización original (a través de history_id).
-        Si el delivery ya tiene `vehicle`, no sobreescribimos y devolvemos None (el cliente puede usar `vehicle`).
+        """Retorna el nombre del tipo de vehículo (string).
+        Prioridad:
+        1. delivery_person.current_vehicle.type.name
+        2. vehicle_type de la cotización original (quote) via history_id
+        3. None si no hay ninguno
         """
         try:
-            # Si ya existe un vehicle asignado (instancia), preferir eso y no intentar buscar el vehicle_type
-            if getattr(obj, 'vehicle', None):
-                return None
+            # 1. Intentar obtener desde delivery_person.current_vehicle
+            dp = getattr(obj, 'delivery_person', None)
+            if dp:
+                cv = getattr(dp, 'current_vehicle', None)
+                if cv:
+                    vt = getattr(cv, 'type', None)
+                    if vt:
+                        return vt.name
 
-            # Buscar la cotización original por history_id
+            # 2. Buscar en la cotización original por history_id
             from .models import DeliveryQuote
             quote = DeliveryQuote.objects.filter(history_id=obj.history_id).first()
-            if not quote or not getattr(quote, 'vehicle_type', None):
-                return None
+            if quote:
+                vt = getattr(quote, 'vehicle_type', None)
+                if vt:
+                    return vt.name
 
-            # Importar el serializer de VehicleType localmente para evitar import circulares
-            try:
-                from vehicles.serializers import VehicleTypeSerializer
-                return VehicleTypeSerializer(quote.vehicle_type).data
-            except Exception:
-                # Si no existe serializer, devolver el nombre (string) si es posible
-                return str(quote.vehicle_type)
+            return None
         except Exception:
             return None
 

@@ -120,7 +120,7 @@ class DeliveryViewSet(viewsets.ModelViewSet):
         # Validar que no esté cancelado
         if current_status == 'cancelled':
             return Response({
-                'error': 'No se puede cambiar el estado de un domicilio cancelado'
+                'detail': 'No se puede cambiar el estado de un domicilio cancelado'
             }, status=status.HTTP_400_BAD_REQUEST)
         
         # Obtener el siguiente estado
@@ -128,7 +128,7 @@ class DeliveryViewSet(viewsets.ModelViewSet):
         
         if next_status is None:
             return Response({
-                'error': f'El domicilio ya está en el estado final: {delivery.get_status_display()}',
+                'detail': f'El domicilio ya está en el estado final: {delivery.get_status_display()}',
                 'current_status': current_status
             }, status=status.HTTP_400_BAD_REQUEST)
         
@@ -168,6 +168,7 @@ class DeliveryViewSet(viewsets.ModelViewSet):
             'message': f'Estado actualizado de {old_status} a {next_status}',
             'old_status': old_status,
             'new_status': next_status,
+            'next_status': STATUS_FLOW.get(next_status),
             'delivery': serialized
         }, status=status.HTTP_200_OK)
 
@@ -319,46 +320,55 @@ class DeliveryOfferViewSet(viewsets.ModelViewSet):
         offer.status = 'rejected'
         offer.save()
         
-        # Registrar en el historial
+        # Registrar en el historial (evento correcto)
         DeliveryHistory.objects.create(
             history_id=offer.quote.history_id,
-            event_type='offer_made',
+            event_type='offer_rejected',
             description=f'Oferta rechazada por el cliente',
             changed_by=request.user
         )
 
         offer_payload = DeliveryOfferSerializer(offer, context={'request': request}).data
+        # Notificar a los grupos relevantes: el quote y el cliente
         _broadcast(f'quote_{str(offer.quote.id)}', {'type': 'offer_rejected', 'data': offer_payload})
         _broadcast(f'user_quotes_{offer.quote.client_id}', {'type': 'offer_rejected', 'data': offer_payload})
 
+        # Notificar también al domiciliario (si está presente) para que reciba la actualización
+        if offer.delivery_person_id:
+            _broadcast(f'driver_offers_{offer.delivery_person_id}', {'type': 'offer_rejected', 'data': offer_payload})
+
         return Response({'status': 'Oferta rechazada'})
-
-    @action(detail=True, methods=['post'], url_path='extend-expiration')
-    def extend_expiration(self, request, pk=None):
-        """Permite extender el tiempo de vida de una oferta pendiente."""
-        offer = self.get_object()
-
-        if offer.status != 'pending':
-            return Response({'error': 'Solo se pueden extender ofertas pendientes'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            minutes = int(request.data.get('minutes') or request.data.get('extra_minutes'))
-        except (TypeError, ValueError):
-            return Response({'error': 'Debe proporcionar "minutes" como entero positivo'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            offer.extend_expiration(minutes)
-        except ValueError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-
-        serializer = self.get_serializer(offer)
-        return Response({'status': 'extendido', 'expires_at': serializer.data['expires_at']})
 
 
 class DeliveryQuoteViewSet(viewsets.ModelViewSet):
     queryset = DeliveryQuote.objects.all()
     serializer_class = DeliveryQuoteSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def perform_update(self, serializer):
+        """Guardar y emitir broadcasts cuando se actualice una cotización.
+
+        Emite al grupo específico de la quote y al grupo del cliente para que
+        los clientes conectados (p. ej. `/ws/deliveries/quotes/<id>/`) reciban
+        la actualización.
+        """
+        quote = serializer.save()
+        serialized = DeliveryQuoteSerializer(quote, context={'request': self.request}).data
+        quote_id = str(quote.id)
+        client_id = quote.client_id
+        payload = {'type': 'quote_updated', 'data': serialized}
+
+        # Grupo específico de la quote
+        _broadcast(f'quote_{quote_id}', payload)
+        # Grupo del cliente que contiene sus quotes
+        if client_id:
+            _broadcast(f'user_quotes_{client_id}', payload)
+        # Opcional: notificar lista global de nuevas quotes si sigue siendo pending
+        try:
+            if quote.status == 'pending':
+                _broadcast('new_quotes', payload)
+        except Exception:
+            pass
 
     def get_queryset(self):
         """Limit access so users only see their own quotes unless staff."""

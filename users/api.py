@@ -64,6 +64,16 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(ratings, many=True)
         return Response(serializer.data)
 
+    @action(detail=False, methods=['get'], url_path='ratings')
+    def my_ratings(self, request):
+        """
+        GET /user/api/me/ratings/ -> lista las reseñas recibidas del usuario autenticado (sin pasar pk)
+        """
+        user = request.user
+        ratings = user.received_ratings.all()
+        serializer = self.get_serializer(ratings, many=True)
+        return Response(serializer.data)
+
     @action(detail=False, methods=['post'], url_path='set-current-vehicle')
     def set_current_vehicle(self, request):
         """
