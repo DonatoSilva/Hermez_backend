@@ -4,6 +4,7 @@ from django.contrib.auth.models import AnonymousUser
 from .models import DeliveryQuote, DeliveryOffer, Delivery
 from .serializers import DeliveryQuoteSerializer, DeliveryOfferSerializer, DeliverySerializer
 import json
+import urllib.parse
 
 # Authentication helpers: try to support DRF Token and SimpleJWT if available
 try:
@@ -41,6 +42,17 @@ class DeliveryConsumer(JsonWebsocketConsumer):
                 token_key = sp
                 matched_subprotocol = sp
                 break
+
+        # Si no se encontró token en subprotocols, intentar leer querystring ?token=...
+        if not token_key:
+            try:
+                qs = self.scope.get('query_string', b'').decode('utf-8')
+                params = urllib.parse.parse_qs(qs)
+                token_vals = params.get('token') or params.get('access_token')
+                if token_vals:
+                    token_key = token_vals[0]
+            except Exception:
+                pass
 
         # Extraer tipo de grupo (quote/delivery/new_quotes) desde la ruta para decisiones de auth
         self.group_type = self.scope.get('url_route', {}).get('kwargs', {}).get('group_type')

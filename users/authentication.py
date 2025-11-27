@@ -55,10 +55,6 @@ class ClerkAuthentication(BaseAuthentication):
             )
 
             user_id = decoded_token.get('sub')
-            logger.debug('Token decodificado: sub=%s exp=%s kid=%s',
-                         user_id, decoded_token.get('exp'), unverified_header.get('kid'))
-            # Print temporal para depuración en consola si el logging no se muestra
-            print(f"[auth-debug] token sub={user_id} exp={decoded_token.get('exp')} kid={unverified_header.get('kid')}")
             if not user_id:
                 raise AuthenticationFailed('Token inválido: falta el ID de usuario.')
 

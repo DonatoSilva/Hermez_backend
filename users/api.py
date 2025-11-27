@@ -114,3 +114,14 @@ class UserRatingViewSet(viewsets.ModelViewSet):
     queryset = UserRating.objects.all()
     serializer_class = UserRatingSerializer
     permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [ClerkAuthentication]
+
+    def get_serializer_context(self):
+        """Pasar el request al serializer para asignar el rater automáticamente."""
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
+    def perform_create(self, serializer):
+        """El rater se asigna automáticamente en el serializer."""
+        serializer.save()
