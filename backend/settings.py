@@ -157,6 +157,9 @@ CLERK_FRONTEND_API_URL = 'https://teaching-bee-17.clerk.accounts.dev'
 CLERK_JWT_AUDIENCE = 'hermez-backend-api'  
 CLERK_JWT_ISSUER = CLERK_FRONTEND_API_URL
 
+# Leeway (segundos) para tolerar pequeños desfases de reloj al validar tokens JWT
+CLERK_JWT_LEEWAY = int(os.environ.get('CLERK_JWT_LEEWAY', '10'))
+
 # Clerk Webhook Signing Secret
 CLERK_WEBHOOK_SIGNING_SECRET = os.environ.get('CLERK_WEBHOOK_SIGNING_SECRET', "tu_signing_secret_de_clerk")
 
@@ -192,3 +195,39 @@ CHANNEL_LAYERS = {
 # Duraciones por defecto para cotizaciones y ofertas (en minutos)
 DELIVERIES_QUOTE_TTL_MINUTES = 10
 DELIVERIES_OFFER_TTL_MINUTES = 4
+
+
+# Logging: mostrar logs de autenticación para depuración local
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'brief': {
+            'format': '%(asctime)s %(levelname)s %(name)s: %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'brief',
+        },
+    },
+    'loggers': {
+        # logger específico para nuestra autenticación
+        'users.authentication': {
+            'handlers': ['console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        # django and uvicorn/http servers
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}

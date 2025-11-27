@@ -42,16 +42,23 @@ class ClerkAuthentication(BaseAuthentication):
             expected_issuer = settings.CLERK_JWT_ISSUER
             expected_audience = settings.CLERK_JWT_AUDIENCE
 
+            # Permitir un pequeño leeway para tolerar desfases de reloj (iat/nbf)
+            leeway = getattr(settings, 'CLERK_JWT_LEEWAY', 0)
             decoded_token = jwt.decode(
                 token,
                 public_key,
                 algorithms=['RS256'],
                 audience=expected_audience,
                 issuer=expected_issuer,
-                options={"verify_signature": True}
+                options={"verify_signature": True},
+                leeway=leeway,
             )
 
             user_id = decoded_token.get('sub')
+            logger.debug('Token decodificado: sub=%s exp=%s kid=%s',
+                         user_id, decoded_token.get('exp'), unverified_header.get('kid'))
+            # Print temporal para depuración en consola si el logging no se muestra
+            print(f"[auth-debug] token sub={user_id} exp={decoded_token.get('exp')} kid={unverified_header.get('kid')}")
             if not user_id:
                 raise AuthenticationFailed('Token inválido: falta el ID de usuario.')
 
