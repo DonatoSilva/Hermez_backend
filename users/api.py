@@ -61,7 +61,7 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         user = self.get_object()
         ratings = user.received_ratings.all()
-        serializer = self.get_serializer(ratings, many=True)
+        serializer = UserRatingSerializer(ratings, many=True, context=self.get_serializer_context())
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='ratings')
@@ -71,7 +71,7 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         user = request.user
         ratings = user.received_ratings.all()
-        serializer = self.get_serializer(ratings, many=True)
+        serializer = UserRatingSerializer(ratings, many=True, context=self.get_serializer_context())
         return Response(serializer.data)
 
     @action(detail=False, methods=['post'], url_path='set-current-vehicle')
